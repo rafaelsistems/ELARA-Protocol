@@ -20,6 +20,14 @@ path = "src/chat.rs"
 name = "msp"
 path = "src/msp.rs"
 
+[[bin]]
+name = "vrp"
+path = "src/vrp.rs"
+
+[[bin]]
+name = "lsp"
+path = "src/lsp.rs"
+
 [dependencies]
 elara-core = { path = "../../crates/elara-core" }
 elara-wire = { path = "../../crates/elara-wire" }
@@ -28,6 +36,8 @@ elara-time = { path = "../../crates/elara-time" }
 elara-state = { path = "../../crates/elara-state" }
 elara-transport = { path = "../../crates/elara-transport" }
 elara-msp = { path = "../../crates/elara-msp" }
+elara-visual = { path = "../../crates/elara-visual" }
+elara-diffusion = { path = "../../crates/elara-diffusion" }
 
 tokio = { version = "1.35", features = ["rt-multi-thread", "net", "time", "sync", "macros", "io-util", "io-std"] }
 crossterm = "0.27"
