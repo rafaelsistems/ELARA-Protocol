@@ -117,7 +117,9 @@ impl DemoNode {
     pub async fn connect_peer(&mut self, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
         // Send hello message
         let hello = format!("HELLO:{}:{:016x}", self.name, self.node_id().0);
-        self.socket.send_to(hello.as_bytes(), addr).await?;
+        println!("[DEBUG] Sending HELLO to {}: {}", addr, hello);
+        let bytes_sent = self.socket.send_to(hello.as_bytes(), addr).await?;
+        println!("[DEBUG] Sent {} bytes to {}", bytes_sent, addr);
         
         Ok(())
     }
@@ -254,7 +256,13 @@ impl DemoNode {
                 let node_id_str = parts[2];
                 let node_id = u64::from_str_radix(node_id_str, 16).unwrap_or(0);
                 
-                // Add peer
+                println!("[DEBUG] Received HELLO from {} - name: {}, node_id: {}", from, name, node_id_str);
+                
+                // Check if already known peer
+                let is_new = !self.peers.contains_key(&from);
+                println!("[DEBUG] is_new peer: {}", is_new);
+                
+                // Add or update peer
                 let peer = Peer {
                     node_id: NodeId::new(node_id),
                     name: name.clone(),
@@ -266,13 +274,18 @@ impl DemoNode {
                     voice_active: false,
                 };
                 self.peers.insert(from, peer);
+                println!("[DEBUG] Added peer, total peers: {}", self.peers.len());
                 
-                // Send hello back
-                let hello = format!("HELLO:{}:{:016x}", self.name, self.node_id().0);
-                self.socket.send_to(hello.as_bytes(), from).await?;
-                
-                // Notify UI
-                let _ = self.event_tx.send(DemoMessage::PeerJoined { name }).await;
+                // Send hello back only if this is a new peer (to avoid loop)
+                if is_new {
+                    let hello = format!("HELLO:{}:{:016x}", self.name, self.node_id().0);
+                    println!("[DEBUG] Sending HELLO back to {}", from);
+                    self.socket.send_to(hello.as_bytes(), from).await?;
+                    
+                    // Notify UI
+                    println!("[DEBUG] Notifying UI about peer joined: {}", name);
+                    let _ = self.event_tx.send(DemoMessage::PeerJoined { name }).await;
+                }
             }
             "MSG" if parts.len() >= 3 => {
                 let from_name = parts[1].to_string();

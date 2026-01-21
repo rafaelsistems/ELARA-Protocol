@@ -31,26 +31,34 @@ impl DemoUI {
                 n.socket()
             };
             
+            println!("[DEBUG] Network receiver started");
             let mut buf = [0u8; 1500];
             loop {
                 match socket.recv_from(&mut buf).await {
                     Ok((len, from)) => {
+                        let data = String::from_utf8_lossy(&buf[..len]);
+                        println!("[DEBUG] Received {} bytes from {}: {}", len, from, data);
                         let mut n = node_recv.lock().await;
                         let _ = n.process_packet(&buf[..len], from).await;
                     }
-                    Err(_) => break,
+                    Err(e) => {
+                        println!("[DEBUG] Receive error: {}", e);
+                        break;
+                    }
                 }
             }
         });
 
         // Spawn event display task
-        let node_events = node.clone();
+        // Extract the receiver from node first to avoid holding lock during recv
+        let event_rx = {
+            let mut n = node.lock().await;
+            std::mem::replace(&mut n.event_rx, tokio::sync::mpsc::channel(1).1)
+        };
         let events_handle = tokio::spawn(async move {
+            let mut rx = event_rx;
             loop {
-                let msg = {
-                    let mut n = node_events.lock().await;
-                    n.event_rx.recv().await
-                };
+                let msg = rx.recv().await;
                 
                 match msg {
                     Some(DemoMessage::Text { from, content }) => {

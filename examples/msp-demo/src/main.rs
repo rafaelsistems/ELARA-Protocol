@@ -57,12 +57,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting node on port {}...", port);
 
     // Create the demo node
-    let node = Arc::new(Mutex::new(DemoNode::new(name.clone(), port).await?));
+    let node = match DemoNode::new(name.clone(), port).await {
+        Ok(n) => Arc::new(Mutex::new(n)),
+        Err(e) => {
+            println!("Failed to create node: {}", e);
+            println!("Try a different port (e.g., port might be in use)");
+            return Ok(());
+        }
+    };
 
     // Connect to peer if specified
     if let Some(addr) = peer_addr {
         println!("Connecting to peer at {}...", addr);
-        node.lock().await.connect_peer(addr).await?;
+        if let Err(e) = node.lock().await.connect_peer(addr).await {
+            println!("Warning: Could not connect to peer: {}", e);
+            println!("Continuing anyway - peer can connect to us later");
+        }
+    } else {
+        println!("No peer specified - waiting for incoming connections...");
+        println!("Share your address: 127.0.0.1:{}", port);
     }
 
     println!();
