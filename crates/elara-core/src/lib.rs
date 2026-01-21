@@ -28,6 +28,7 @@ pub mod class;
 pub mod error;
 pub mod invariants;
 pub mod models;
+pub mod science;
 
 pub use id::*;
 pub use time::*;
@@ -37,3 +38,8 @@ pub use class::*;
 pub use error::*;
 pub use invariants::{Invariant, InvariantViolation, InvariantCompliant};
 pub use models::{ProtocolModel, ReconstructabilityClass, PerceptualWeight, ModelCompliant};
+pub use science::{
+    NodeClass, NodeClassSet, EventOperator, 
+    PresenceVector, DegradationLevel, 
+    ChaosCategory, ChaosSuccessCriteria, ChaosTestResult
+};
