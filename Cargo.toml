@@ -12,6 +12,7 @@ members = [
     "crates/elara-test",
     "crates/elara-ffi",
     "crates/elara-visual",
+    "crates/elara-diffusion",
     "examples/msp-demo",
 ]
 

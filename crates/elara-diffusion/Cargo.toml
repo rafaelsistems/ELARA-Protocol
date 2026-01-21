@@ -1,0 +1,11 @@
+[package]
+name = "elara-diffusion"
+version = "0.1.0"
+edition = "2021"
+description = "ELARA Swarm Diffusion - State propagation for livestream and group"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+
+[dev-dependencies]
