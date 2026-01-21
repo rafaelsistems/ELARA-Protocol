@@ -1,0 +1,23 @@
+[package]
+name = "elara-ffi"
+description = "ELARA Protocol - Foreign Function Interface for mobile SDKs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+elara-wire = { path = "../elara-wire" }
+elara-crypto = { path = "../elara-crypto" }
+elara-time = { path = "../elara-time" }
+elara-state = { path = "../elara-state" }
+elara-transport = { path = "../elara-transport" }
+elara-msp = { path = "../elara-msp" }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[build-dependencies]
+cbindgen = "0.26"
