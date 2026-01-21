@@ -25,3 +25,15 @@ proptest = { workspace = true }
 [[bench]]
 name = "wire_bench"
 harness = false
+
+[[bench]]
+name = "crypto_bench"
+harness = false
+
+[[bench]]
+name = "time_bench"
+harness = false
+
+[[bench]]
+name = "state_bench"
+harness = false
