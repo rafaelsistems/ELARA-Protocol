@@ -1,0 +1,11 @@
+[package]
+name = "elara-visual"
+version = "0.1.0"
+edition = "2021"
+description = "ELARA Visual State - Video as state, not stream"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+
+[dev-dependencies]
