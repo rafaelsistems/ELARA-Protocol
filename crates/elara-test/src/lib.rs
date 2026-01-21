@@ -16,6 +16,7 @@ pub mod time_simulator;
 pub mod state_fuzzer;
 pub mod integration;
 pub mod chaos_harness;
+pub mod network_test;
 
 pub use chaos::*;
 pub use simulator::*;
