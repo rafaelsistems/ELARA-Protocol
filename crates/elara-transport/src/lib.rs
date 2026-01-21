@@ -4,8 +4,10 @@
 //! - UDP transport
 //! - Packet scheduling
 //! - Multi-path support (future)
-//! - NAT traversal (future)
+//! - NAT traversal (STUN)
 
 pub mod udp;
+pub mod stun;
 
 pub use udp::*;
+pub use stun::{StunClient, StunResult, NatType, STUN_SERVERS};
