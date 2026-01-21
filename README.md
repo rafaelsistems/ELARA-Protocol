@@ -23,6 +23,20 @@ Traditional: Network bad → Freeze → Reset → Reconnect
 ELARA:       Network bad → Bend time → Simplify reality → Keep flowing
 ```
 
+## Hard Invariants
+
+ELARA is governed by five **hard invariants**. These are not guidelines—they are system laws. If any single invariant falls, the system is not ELARA.
+
+| # | Invariant | Meaning |
+|---|-----------|---------|
+| 1 | **Reality Never Waits** | System never blocks reality for synchronization |
+| 2 | **Presence Over Packets** | Existence matters more than data perfection |
+| 3 | **Experience Degrades, Never Collapses** | Quality reduces, never fails |
+| 4 | **Event Is Truth, State Is Projection** | Events are authoritative, state is cache |
+| 5 | **Identity Survives Transport** | Identity persists beyond connections |
+
+See [HARD_INVARIANTS.md](docs/HARD_INVARIANTS.md) for the complete specification.
+
 ## Features
 
 - 🔐 **Cryptographic Reality Physics** - Identity-bound, server-blind encryption
