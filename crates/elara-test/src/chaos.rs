@@ -139,6 +139,23 @@ impl ChaosConfig {
             duplicate_prob: 0.05,
         }
     }
+
+    /// Moderate network conditions
+    pub fn moderate() -> Self {
+        ChaosConfig {
+            base_latency: Duration::from_millis(50),
+            jitter: JitterDistribution::Uniform {
+                min_ms: 0,
+                max_ms: 30,
+            },
+            loss_rate: 0.03,
+            burst_loss_prob: 0.1,
+            burst_length: (2, 4),
+            reorder_prob: 0.05,
+            reorder_depth: 3,
+            duplicate_prob: 0.01,
+        }
+    }
 }
 
 /// Packet in the chaos network
@@ -201,8 +218,13 @@ impl ChaosStats {
 }
 
 impl ChaosNetwork {
+    /// Create a new chaos network with default seed
+    pub fn new(config: ChaosConfig) -> Self {
+        Self::with_seed(config, 12345)
+    }
+
     /// Create a new chaos network with seed
-    pub fn new(config: ChaosConfig, seed: u64) -> Self {
+    pub fn with_seed(config: ChaosConfig, seed: u64) -> Self {
         ChaosNetwork {
             config,
             rng: StdRng::seed_from_u64(seed),
@@ -264,8 +286,8 @@ impl ChaosNetwork {
         }
     }
 
-    /// Check if packet should be dropped
-    fn should_drop(&mut self) -> bool {
+    /// Check if packet should be dropped (public for integration tests)
+    pub fn should_drop(&mut self) -> bool {
         // Burst loss
         if self.burst_remaining > 0 {
             self.burst_remaining -= 1;
@@ -331,7 +353,7 @@ mod tests {
     #[test]
     fn test_chaos_network_basic() {
         let config = ChaosConfig::good();
-        let mut network = ChaosNetwork::new(config, 12345);
+        let mut network = ChaosNetwork::with_seed(config, 12345);
 
         // Send some packets
         for i in 0..100 {
@@ -353,7 +375,7 @@ mod tests {
     #[test]
     fn test_chaos_network_hostile() {
         let config = ChaosConfig::hostile();
-        let mut network = ChaosNetwork::new(config, 12345);
+        let mut network = ChaosNetwork::with_seed(config, 12345);
 
         // Send packets
         for i in 0..1000 {

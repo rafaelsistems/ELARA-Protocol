@@ -62,7 +62,7 @@ impl NetworkSimulator {
 
         self.links
             .entry((from, to))
-            .or_insert_with(|| ChaosNetwork::new(self.default_config.clone(), seed))
+            .or_insert_with(|| ChaosNetwork::with_seed(self.default_config.clone(), seed))
     }
 
     /// Send a packet from one node to another
@@ -96,7 +96,7 @@ impl NetworkSimulator {
     pub fn set_link_config(&mut self, from: NodeId, to: NodeId, config: ChaosConfig) {
         let seed = self.seed_counter;
         self.seed_counter += 1;
-        self.links.insert((from, to), ChaosNetwork::new(config, seed));
+        self.links.insert((from, to), ChaosNetwork::with_seed(config, seed));
     }
 
     /// Get statistics for a link

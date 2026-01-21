@@ -189,7 +189,7 @@ impl TimeSimulator {
     pub fn set_network(&mut self, from: NodeId, to: NodeId, config: ChaosConfig) {
         let seed = self.seed_counter;
         self.seed_counter += 1;
-        self.networks.insert((from, to), ChaosNetwork::new(config, seed));
+        self.networks.insert((from, to), ChaosNetwork::with_seed(config, seed));
     }
 
     /// Run simulation for a duration
