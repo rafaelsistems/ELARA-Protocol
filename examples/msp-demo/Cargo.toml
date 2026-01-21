@@ -16,6 +16,10 @@ path = "src/simple_test.rs"
 name = "chat"
 path = "src/chat.rs"
 
+[[bin]]
+name = "msp"
+path = "src/msp.rs"
+
 [dependencies]
 elara-core = { path = "../../crates/elara-core" }
 elara-wire = { path = "../../crates/elara-wire" }
