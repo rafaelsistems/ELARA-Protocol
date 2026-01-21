@@ -1,0 +1,16 @@
+[package]
+name = "elara-transport"
+description = "ELARA Protocol - Transport layer (UDP, multi-path)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+elara-wire = { path = "../elara-wire" }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

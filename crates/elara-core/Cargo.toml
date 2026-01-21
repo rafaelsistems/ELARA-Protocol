@@ -1,0 +1,13 @@
+[package]
+name = "elara-core"
+description = "ELARA Protocol - Core types and primitives"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bytes = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

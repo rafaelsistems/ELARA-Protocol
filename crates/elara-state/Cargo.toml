@@ -1,0 +1,15 @@
+[package]
+name = "elara-state"
+description = "ELARA Protocol - State Engine (reconciliation, divergence, partition)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+elara-time = { path = "../elara-time" }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

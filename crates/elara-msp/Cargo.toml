@@ -1,0 +1,18 @@
+[package]
+name = "elara-msp"
+description = "ELARA Protocol - Minimal Survival Profile (text + voice)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+elara-wire = { path = "../elara-wire" }
+elara-crypto = { path = "../elara-crypto" }
+elara-time = { path = "../elara-time" }
+elara-state = { path = "../elara-state" }
+elara-runtime = { path = "../elara-runtime" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

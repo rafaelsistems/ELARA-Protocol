@@ -1,0 +1,21 @@
+[package]
+name = "elara-runtime"
+description = "ELARA Protocol - Runtime loop and node orchestration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+elara-wire = { path = "../elara-wire" }
+elara-crypto = { path = "../elara-crypto" }
+elara-time = { path = "../elara-time" }
+elara-state = { path = "../elara-state" }
+elara-transport = { path = "../elara-transport" }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -1,0 +1,14 @@
+[package]
+name = "elara-wire"
+description = "ELARA Protocol - Wire format and packet encoding"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

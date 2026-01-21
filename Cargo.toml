@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/elara-core",
+    "crates/elara-wire",
+    "crates/elara-crypto",
+    "crates/elara-time",
+    "crates/elara-state",
+    "crates/elara-transport",
+    "crates/elara-runtime",
+    "crates/elara-msp",
+    "crates/elara-test",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2025"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Rafael2022-prog/ELARA-Protocol"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Crypto
+rand = "0.8"
+chacha20poly1305 = "0.10"
+x25519-dalek = "2.0"
+ed25519-dalek = { version = "2.0", features = ["rand_core"] }
+sha2 = "0.10"
+hkdf = "0.12"
+
+# Async
+tokio = { version = "1.35", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
+
+# Serialization
+bytes = "1.5"
+
+# Utils
+thiserror = "1.0"
+tracing = "0.1"
+parking_lot = "0.12"
+
+# Testing
+criterion = "0.5"
+proptest = "1.4"

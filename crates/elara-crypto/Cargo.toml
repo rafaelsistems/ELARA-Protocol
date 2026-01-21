@@ -1,0 +1,20 @@
+[package]
+name = "elara-crypto"
+description = "ELARA Protocol - Cryptographic engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+elara-core = { path = "../elara-core" }
+elara-wire = { path = "../elara-wire" }
+rand = { workspace = true }
+chacha20poly1305 = { workspace = true }
+x25519-dalek = { workspace = true }
+ed25519-dalek = { workspace = true }
+sha2 = { workspace = true }
+hkdf = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
