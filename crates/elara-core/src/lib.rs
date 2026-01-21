@@ -27,6 +27,7 @@ pub mod event;
 pub mod class;
 pub mod error;
 pub mod invariants;
+pub mod models;
 
 pub use id::*;
 pub use time::*;
@@ -35,3 +36,4 @@ pub use event::*;
 pub use class::*;
 pub use error::*;
 pub use invariants::{Invariant, InvariantViolation, InvariantCompliant};
+pub use models::{ProtocolModel, ReconstructabilityClass, PerceptualWeight, ModelCompliant};
