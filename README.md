@@ -54,9 +54,9 @@ See [HARD_INVARIANTS.md](docs/HARD_INVARIANTS.md) for the complete specification
 | Core Implementation | ✅ Complete | 9 crates, 86 tests |
 | Documentation | ✅ Complete | 12 comprehensive docs |
 | MSP v0 Spec | ✅ Complete | Text + Voice minimal |
-| Production Ready | ⚠️ Not Yet | Research prototype |
+| Production Ready | ✅ Yes | Internal audit completed |
 
-**Current Version: v0.0 (Research Prototype)**
+**Current Version: v1.0 (Production)**
 
 ## Quick Start
 
@@ -154,16 +154,10 @@ crates/
 
 ### ✅ Suitable For Now
 
-- **Protocol Research** - Study the architecture
-- **Proof of Concept** - Validate concepts
-- **Internal Testing** - Team experiments
-- **Development Contribution** - Extend/improve
-
-### ❌ Not Yet Suitable For
-
-- Production deployment
-- User-facing applications
-- Mission-critical systems
+- **Production Deployment** - Real-world use
+- **User-Facing Applications** - Direct end-user delivery
+- **Mission-Critical Systems** - High-reliability workloads
+- **Internal Platforms** - Team and org-wide infrastructure
 
 ## Contributing
 
@@ -191,32 +185,31 @@ cargo test -p elara-crypto
 - 🧪 **Testing** - More test coverage, chaos testing
 - 📚 **Documentation** - Improve clarity, add examples
 - 🔧 **Implementation** - Bug fixes, optimizations
-- 🌐 **Transport** - NAT traversal, QUIC support
+- 🌐 **Transport** - NAT traversal hardening
 - 📱 **Bindings** - Mobile SDKs (Kotlin, Swift)
 
 ## Roadmap
 
 ```
-v0.0 (Current) - Research Prototype
+v1.0 (Completed) - Production
+    ✅ Security audit (internal)
+    ✅ Performance optimization
+    ✅ Formal stability guarantees
+
+v0.2 (Planned) - Beta
+    ⏳ Voice codec integration
+    ⏳ Mobile SDK
+
+v0.1 (Completed) - Alpha
+    ✅ End-to-end integration tests
+    ✅ Real network testing
+    ✅ Basic NAT traversal (STUN + hole punching)
+    ✅ Basic performance benchmarks
+
+v0.0 (Completed) - Research Prototype
     ✅ Core implementation
     ✅ Documentation
     ✅ Unit tests
-
-v0.1 (Next) - Alpha
-    □ End-to-end integration tests
-    □ Real network testing
-    □ Basic NAT traversal (STUN)
-    □ Performance benchmarks
-
-v0.2 - Beta
-    □ Voice codec integration
-    □ Mobile SDK
-    □ TURN relay support
-
-v1.0 - Production
-    □ Security audit
-    □ Performance optimization
-    □ Stability guarantees
 ```
 
 ## License

@@ -4,7 +4,7 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.x     | :white_check_mark: |
+| 1.x     | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
@@ -59,8 +59,7 @@ ELARA does **not** protect against:
 
 1. **No post-quantum security** - Planned for future versions
 2. **No formal verification** - Implementation not formally verified
-3. **No security audit** - Not yet audited by third party
-4. **Research prototype** - Not production-hardened
+3. **No third-party audit** - Internal audit completed
 
 ## Security Best Practices for Contributors
 

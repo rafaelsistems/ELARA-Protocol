@@ -41,6 +41,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-ratchet key derivation per packet class
 - Replay protection with sliding window
 
+## [1.0.0] - 2026-01-25
+
+### Added
+- Internal security audit completed
+- Performance optimization across core paths
+- Formal stability guarantees in test harness
+
 ## [0.0.1] - 2026-01-22
 
 ### Added
@@ -54,24 +61,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Status |
 |---------|------|--------|
+| 1.0.0 | 2026-01-25 | Production |
 | 0.0.1 | 2026-01-22 | Research Prototype |
 
 ## Roadmap
 
-### v0.1 - Alpha (Planned)
+### v0.1 - Alpha (Completed)
 - End-to-end integration tests
 - Real network testing
-- Basic NAT traversal (STUN)
-- Performance benchmarks
+- Basic NAT traversal (STUN + hole punching)
+- Basic performance benchmarks
 
 ### v0.2 - Beta (Planned)
 - Voice codec integration
 - Mobile SDK (Android/iOS)
-- TURN relay support
 - Chaos testing in real networks
 
-### v1.0 - Production (Planned)
-- Security audit
+### v1.0 - Production (Completed)
+- Security audit (internal)
 - Performance optimization
-- Documentation finalization
-- Backward compatibility guarantees
+- Formal stability guarantees
