@@ -96,7 +96,8 @@ impl NetworkSimulator {
     pub fn set_link_config(&mut self, from: NodeId, to: NodeId, config: ChaosConfig) {
         let seed = self.seed_counter;
         self.seed_counter += 1;
-        self.links.insert((from, to), ChaosNetwork::with_seed(config, seed));
+        self.links
+            .insert((from, to), ChaosNetwork::with_seed(config, seed));
     }
 
     /// Get statistics for a link

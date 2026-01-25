@@ -112,7 +112,12 @@ impl StateId {
 
 impl fmt::Debug for StateId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "State({:04x}:{:012x})", self.state_type(), self.instance())
+        write!(
+            f,
+            "State({:04x}:{:012x})",
+            self.state_type(),
+            self.instance()
+        )
     }
 }
 
@@ -183,7 +188,7 @@ mod tests {
         let state_type = 0x0001; // e.g., text stream
         let instance = 0x0000_1234_5678_9ABC;
         let id = StateId::from_type_instance(state_type, instance);
-        
+
         assert_eq!(id.state_type(), state_type);
         assert_eq!(id.instance(), instance);
     }
@@ -194,7 +199,7 @@ mod tests {
         let state_type = 0x0002;
         let instance = 0xFFFF_FFFF_FFFF_FFFF; // All bits set
         let id = StateId::from_type_instance(state_type, instance);
-        
+
         assert_eq!(id.state_type(), state_type);
         assert_eq!(id.instance(), 0x0000_FFFF_FFFF_FFFF); // Truncated
     }

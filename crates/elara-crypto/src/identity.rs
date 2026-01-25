@@ -17,7 +17,7 @@ pub struct Identity {
 impl Identity {
     /// Generate a new random identity
     pub fn generate() -> Self {
-        let signing_key = SigningKey::generate(&mut OsRng::default());
+        let signing_key = SigningKey::generate(&mut OsRng);
         let verifying_key = signing_key.verifying_key();
         let node_id = Self::derive_node_id(&verifying_key);
 

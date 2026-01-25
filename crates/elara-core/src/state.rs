@@ -157,7 +157,8 @@ impl AuthoritySet {
 
     /// Check if a node is in the authority set (owner or delegate)
     pub fn contains(&self, node: &NodeId) -> bool {
-        !self.revoked.contains(node) && (self.owners.contains(node) || self.delegates.contains_key(node))
+        !self.revoked.contains(node)
+            && (self.owners.contains(node) || self.delegates.contains_key(node))
     }
 
     /// Check if a node is revoked
@@ -196,9 +197,10 @@ impl AuthorityScope {
 }
 
 /// Delta law - how to merge conflicting mutations
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum DeltaLaw {
     /// Last-writer-wins based on timestamp
+    #[default]
     LastWriterWins,
     /// Append-only list (CRDT)
     AppendOnly { max_size: usize },
@@ -211,12 +213,6 @@ pub enum DeltaLaw {
         interpolation: InterpolationType,
         max_deviation: f64,
     },
-}
-
-impl Default for DeltaLaw {
-    fn default() -> Self {
-        DeltaLaw::LastWriterWins
-    }
 }
 
 /// Counter merge strategy

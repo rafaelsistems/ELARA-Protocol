@@ -22,14 +22,14 @@
 //! - L4: Presence pulse only
 //! - L5: Identity heartbeat
 
-pub mod state;
+pub mod encoding;
 pub mod frame;
 pub mod prediction;
-pub mod encoding;
+pub mod state;
 pub mod synthesis;
 
-pub use state::*;
+pub use encoding::*;
 pub use frame::*;
 pub use prediction::*;
-pub use encoding::*;
+pub use state::*;
 pub use synthesis::*;

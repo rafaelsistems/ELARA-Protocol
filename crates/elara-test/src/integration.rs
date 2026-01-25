@@ -6,12 +6,7 @@
 //! - Degradation ladder compliance
 //! - Invariant verification
 
-use std::collections::HashMap;
-use std::time::Duration;
-
-use elara_core::{
-    NodeId, PresenceVector, DegradationLevel, VersionVector,
-};
+use elara_core::{DegradationLevel, NodeId, PresenceVector, VersionVector};
 
 use crate::chaos::{ChaosConfig, ChaosNetwork};
 
@@ -24,19 +19,19 @@ use crate::chaos::{ChaosConfig, ChaosNetwork};
 pub struct SimulatedNode {
     /// Node identity
     pub node_id: NodeId,
-    
+
     /// Local version vector (tracks what this node has seen)
     version: VersionVector,
-    
+
     /// Messages received
     messages: Vec<Vec<u8>>,
-    
+
     /// Current presence vector
     presence: PresenceVector,
-    
+
     /// Current degradation level
     degradation_level: DegradationLevel,
-    
+
     /// Event sequence counter
     seq: u64,
 }
@@ -58,7 +53,7 @@ impl SimulatedNode {
     pub fn emit_message(&mut self, content: Vec<u8>) -> SimulatedMessage {
         self.seq += 1;
         self.version.increment(self.node_id);
-        
+
         SimulatedMessage {
             source: self.node_id,
             seq: self.seq,
@@ -74,7 +69,7 @@ impl SimulatedNode {
             // Already seen or older
             return false;
         }
-        
+
         // Merge version vectors
         self.version = self.version.merge(&msg.version);
         self.messages.push(msg.content.clone());
@@ -156,10 +151,10 @@ pub struct SimulatedMessage {
 pub struct IntegrationTestConfig {
     /// Number of nodes
     pub node_count: usize,
-    
+
     /// Number of messages to generate
     pub message_count: usize,
-    
+
     /// Enable chaos
     pub chaos: Option<ChaosConfig>,
 }
@@ -210,22 +205,22 @@ impl IntegrationTestConfig {
 pub struct IntegrationTestResult {
     /// Did all nodes converge?
     pub converged: bool,
-    
+
     /// Total messages processed
     pub messages_processed: usize,
-    
+
     /// Messages dropped (due to chaos)
     pub messages_dropped: usize,
-    
+
     /// Final presence vectors per node
     pub presence_vectors: Vec<PresenceVector>,
-    
+
     /// Final degradation levels per node
     pub degradation_levels: Vec<DegradationLevel>,
-    
+
     /// Were all invariants maintained?
     pub invariants_maintained: bool,
-    
+
     /// Specific invariant violations
     pub invariant_violations: Vec<String>,
 }
@@ -292,22 +287,22 @@ impl IntegrationTestHarness {
     pub fn run(&mut self) -> IntegrationTestResult {
         // Generate messages from random nodes
         self.generate_messages();
-        
+
         // Deliver messages to all nodes (with chaos if enabled)
         self.deliver_messages();
-        
+
         // Check convergence
         let converged = self.check_convergence();
-        
+
         // Check invariants
         let (invariants_maintained, violations) = self.check_invariants();
-        
+
         // Collect results
         IntegrationTestResult {
             converged,
             messages_processed: self.messages_delivered,
             messages_dropped: self.messages_dropped,
-            presence_vectors: self.nodes.iter().map(|n| n.presence().clone()).collect(),
+            presence_vectors: self.nodes.iter().map(|n| *n.presence()).collect(),
             degradation_levels: self.nodes.iter().map(|n| n.degradation_level()).collect(),
             invariants_maintained,
             invariant_violations: violations,
@@ -318,9 +313,7 @@ impl IntegrationTestHarness {
     fn generate_messages(&mut self) {
         for i in 0..self.config.message_count {
             let node_idx = i % self.nodes.len();
-            let msg = self.nodes[node_idx].emit_message(
-                format!("Message {}", i).into_bytes(),
-            );
+            let msg = self.nodes[node_idx].emit_message(format!("Message {}", i).into_bytes());
             self.messages_generated.push(msg);
         }
     }
@@ -347,7 +340,7 @@ impl IntegrationTestHarness {
                     }
                 } else {
                     self.messages_dropped += 1;
-                    
+
                     // Degrade presence when messages are dropped
                     node.update_presence(0.95);
                 }
@@ -364,7 +357,7 @@ impl IntegrationTestHarness {
         // All nodes should have received the same number of messages
         // (accounting for their own messages)
         let expected_per_node = self.config.message_count;
-        
+
         // With chaos, we allow some divergence
         if self.chaos_network.is_some() {
             // Just check that all nodes are alive
@@ -376,12 +369,13 @@ impl IntegrationTestHarness {
         self.nodes.iter().all(|n| {
             // Each node should have all messages except its own
             // (which it generated, not received)
-            let own_messages = self.messages_generated
+            let own_messages = self
+                .messages_generated
                 .iter()
                 .filter(|m| m.source == n.node_id)
                 .count();
-            n.message_count() == first_count || 
-            n.message_count() == expected_per_node - own_messages
+            n.message_count() == first_count
+                || n.message_count() == expected_per_node - own_messages
         })
     }
 
@@ -395,10 +389,7 @@ impl IntegrationTestHarness {
         // INV-2: Presence Over Packets
         for (i, node) in self.nodes.iter().enumerate() {
             if !node.is_alive() {
-                violations.push(format!(
-                    "INV-2 violated: Node {} presence is dead",
-                    i
-                ));
+                violations.push(format!("INV-2 violated: Node {} presence is dead", i));
             }
         }
 
@@ -407,10 +398,7 @@ impl IntegrationTestHarness {
         for (i, node) in self.nodes.iter().enumerate() {
             // L5 is the floor - there's no "disconnected" state
             if node.degradation_level() > DegradationLevel::L5_LatentPresence {
-                violations.push(format!(
-                    "INV-3 violated: Node {} degraded beyond L5",
-                    i
-                ));
+                violations.push(format!("INV-3 violated: Node {} degraded beyond L5", i));
             }
         }
 
@@ -447,8 +435,7 @@ pub fn test_basic_convergence() -> IntegrationTestResult {
 
 /// Test convergence under moderate chaos
 pub fn test_convergence_with_chaos() -> IntegrationTestResult {
-    let config = IntegrationTestConfig::standard()
-        .with_chaos(ChaosConfig::moderate());
+    let config = IntegrationTestConfig::standard().with_chaos(ChaosConfig::moderate());
     let mut harness = IntegrationTestHarness::new(config);
     harness.run()
 }
@@ -463,44 +450,53 @@ pub fn test_convergence_under_stress() -> IntegrationTestResult {
 /// Test that degradation follows the ladder
 pub fn test_degradation_ladder() -> bool {
     let mut node = SimulatedNode::new(NodeId::new(1));
-    
+
     // Start at L0
-    assert_eq!(node.degradation_level(), DegradationLevel::L0_FullPerception);
-    
+    assert_eq!(
+        node.degradation_level(),
+        DegradationLevel::L0_FullPerception
+    );
+
     // Degrade through all levels
     let mut levels_visited = vec![node.degradation_level()];
     while node.degrade() {
         levels_visited.push(node.degradation_level());
     }
-    
+
     // Should have visited all 6 levels
     assert_eq!(levels_visited.len(), 6);
-    
+
     // Should end at L5
-    assert_eq!(node.degradation_level(), DegradationLevel::L5_LatentPresence);
-    
+    assert_eq!(
+        node.degradation_level(),
+        DegradationLevel::L5_LatentPresence
+    );
+
     // Cannot degrade further
     assert!(!node.degrade());
-    
+
     // Improve back up
     while node.improve() {}
-    
+
     // Should be back at L0
-    assert_eq!(node.degradation_level(), DegradationLevel::L0_FullPerception);
-    
+    assert_eq!(
+        node.degradation_level(),
+        DegradationLevel::L0_FullPerception
+    );
+
     true
 }
 
 /// Test that presence never goes to zero under normal degradation
 pub fn test_presence_floor() -> bool {
     let mut node = SimulatedNode::new(NodeId::new(1));
-    
+
     // Simulate severe degradation
     for _ in 0..100 {
         node.update_presence(0.9);
         node.degrade();
     }
-    
+
     // Even after severe degradation, presence should be > 0
     // (In practice, we'd enforce a floor in the PresenceVector)
     node.is_alive() || node.presence().score() >= 0.0
@@ -515,16 +511,19 @@ mod tests {
         let node = SimulatedNode::new(NodeId::new(1));
         assert_eq!(node.node_id, NodeId::new(1));
         assert!(node.is_alive());
-        assert_eq!(node.degradation_level(), DegradationLevel::L0_FullPerception);
+        assert_eq!(
+            node.degradation_level(),
+            DegradationLevel::L0_FullPerception
+        );
     }
 
     #[test]
     fn test_message_emission() {
         let mut node = SimulatedNode::new(NodeId::new(1));
-        
+
         let msg1 = node.emit_message(vec![1, 2, 3]);
         let msg2 = node.emit_message(vec![4, 5, 6]);
-        
+
         assert_eq!(msg1.seq, 1);
         assert_eq!(msg2.seq, 2);
         assert_eq!(msg1.source, NodeId::new(1));
@@ -534,12 +533,12 @@ mod tests {
     fn test_message_reception() {
         let mut node1 = SimulatedNode::new(NodeId::new(1));
         let mut node2 = SimulatedNode::new(NodeId::new(2));
-        
+
         let msg = node1.emit_message(b"Hello".to_vec());
-        
+
         assert!(node2.receive_message(&msg));
         assert_eq!(node2.message_count(), 1);
-        
+
         // After receiving, node2's version includes node1's updates
         // So the same message's version is now "happens_before" node2's version
         // which means it should be rejected as already seen
@@ -551,12 +550,18 @@ mod tests {
     fn test_basic_convergence_test() {
         let result = test_basic_convergence();
         assert!(result.all_alive(), "All nodes should be alive");
-        assert!(result.invariants_maintained, "Invariants should be maintained");
+        assert!(
+            result.invariants_maintained,
+            "Invariants should be maintained"
+        );
     }
 
     #[test]
     fn test_degradation_ladder_test() {
-        assert!(test_degradation_ladder(), "Degradation ladder test should pass");
+        assert!(
+            test_degradation_ladder(),
+            "Degradation ladder test should pass"
+        );
     }
 
     #[test]
@@ -564,18 +569,24 @@ mod tests {
         let config = IntegrationTestConfig::minimal();
         let mut harness = IntegrationTestHarness::new(config);
         let result = harness.run();
-        
+
         assert!(result.all_alive(), "All nodes should be alive");
-        assert!(result.invariants_maintained, "Invariants should be maintained");
+        assert!(
+            result.invariants_maintained,
+            "Invariants should be maintained"
+        );
     }
 
     #[test]
     fn test_with_moderate_chaos() {
         let result = test_convergence_with_chaos();
-        
+
         // With chaos, we may not converge perfectly, but:
         assert!(result.all_alive(), "All nodes should still be alive");
-        assert!(result.invariants_maintained, "Invariants should be maintained");
+        assert!(
+            result.invariants_maintained,
+            "Invariants should be maintained"
+        );
     }
 
     #[test]

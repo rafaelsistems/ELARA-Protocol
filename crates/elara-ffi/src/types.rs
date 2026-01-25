@@ -1,7 +1,5 @@
 //! FFI Types - C-compatible type definitions
 
-use std::ffi::c_char;
-
 /// Node ID (64-bit)
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -100,6 +98,7 @@ impl From<elara_core::PresenceVector> for ElaraPresence {
 
 /// Degradation level
 #[repr(C)]
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy)]
 pub enum ElaraDegradationLevel {
     L0_FullPerception = 0,
@@ -132,14 +131,9 @@ pub type ElaraMessageCallback = extern "C" fn(
 );
 
 /// Callback function type for presence updates
-pub type ElaraPresenceCallback = extern "C" fn(
-    user_data: *mut std::ffi::c_void,
-    node: ElaraNodeId,
-    presence: ElaraPresence,
-);
+pub type ElaraPresenceCallback =
+    extern "C" fn(user_data: *mut std::ffi::c_void, node: ElaraNodeId, presence: ElaraPresence);
 
 /// Callback function type for degradation changes
-pub type ElaraDegradationCallback = extern "C" fn(
-    user_data: *mut std::ffi::c_void,
-    level: ElaraDegradationLevel,
-);
+pub type ElaraDegradationCallback =
+    extern "C" fn(user_data: *mut std::ffi::c_void, level: ElaraDegradationLevel);

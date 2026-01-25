@@ -8,12 +8,13 @@
 //! - Repair: State sync - delayed OK
 
 /// Packet class determines network and crypto behavior
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[repr(u8)]
 pub enum PacketClass {
     /// Core state: identity, presence, session, crypto
     /// Network: redundant, never dropped
     /// Crypto: strongest ratchet
+    #[default]
     Core = 0x00,
 
     /// Perceptual state: voice, typing, live updates
@@ -112,17 +113,12 @@ impl PacketClass {
     }
 }
 
-impl Default for PacketClass {
-    fn default() -> Self {
-        PacketClass::Core
-    }
-}
-
 /// Representation profile hint
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 #[repr(u8)]
 pub enum RepresentationProfile {
     /// Text-based communication
+    #[default]
     Textual = 0x00,
 
     /// Minimal voice (MSP baseline)
@@ -176,12 +172,6 @@ impl RepresentationProfile {
             self,
             RepresentationProfile::Textual | RepresentationProfile::VoiceMinimal
         )
-    }
-}
-
-impl Default for RepresentationProfile {
-    fn default() -> Self {
-        RepresentationProfile::Textual
     }
 }
 

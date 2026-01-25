@@ -176,12 +176,10 @@ impl Extensions {
             // Parse known extensions
             match ExtensionType::from_byte(ext_type) {
                 Some(ExtensionType::RatchetId) if ext_len == 4 => {
-                    extensions.ratchet_id =
-                        Some(u32::from_le_bytes(value.try_into().unwrap()));
+                    extensions.ratchet_id = Some(u32::from_le_bytes(value.try_into().unwrap()));
                 }
                 Some(ExtensionType::KeyEpoch) if ext_len == 2 => {
-                    extensions.key_epoch =
-                        Some(u16::from_le_bytes(value.try_into().unwrap()));
+                    extensions.key_epoch = Some(u16::from_le_bytes(value.try_into().unwrap()));
                 }
                 Some(ExtensionType::SwarmRole) if ext_len == 1 => {
                     extensions.swarm_role = SwarmRole::from_byte(value[0]);
@@ -190,8 +188,7 @@ impl Extensions {
                     extensions.relay_hop = Some(value[0]);
                 }
                 Some(ExtensionType::InterestMask) if ext_len == 8 => {
-                    extensions.interest_mask =
-                        Some(u64::from_le_bytes(value.try_into().unwrap()));
+                    extensions.interest_mask = Some(u64::from_le_bytes(value.try_into().unwrap()));
                 }
                 Some(ExtensionType::RedundancyGroup) if ext_len == 2 => {
                     extensions.redundancy_group =
@@ -205,8 +202,7 @@ impl Extensions {
                         Some(FragmentInfo::from_bytes(value.try_into().unwrap()));
                 }
                 Some(ExtensionType::PathId) if ext_len == 2 => {
-                    extensions.path_id =
-                        Some(u16::from_le_bytes(value.try_into().unwrap()));
+                    extensions.path_id = Some(u16::from_le_bytes(value.try_into().unwrap()));
                 }
                 Some(ExtensionType::PriorityHint) if ext_len == 1 => {
                     extensions.priority_hint = Some(value[0]);
@@ -265,7 +261,10 @@ impl Extensions {
             write_ext!(ExtensionType::InterestMask, Some(v.to_le_bytes().to_vec()));
         }
         if let Some(v) = self.redundancy_group {
-            write_ext!(ExtensionType::RedundancyGroup, Some(v.to_le_bytes().to_vec()));
+            write_ext!(
+                ExtensionType::RedundancyGroup,
+                Some(v.to_le_bytes().to_vec())
+            );
         }
         if let Some(v) = self.compression_hint {
             write_ext!(ExtensionType::CompressionHint, Some(vec![v]));

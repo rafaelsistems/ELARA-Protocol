@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use elara_core::{NodeId, PerceptualTime, RealityWindow, StateTime, TimePosition};
-use elara_time::{NetworkModel, PeerNetworkModel, TimeEngine, TimeEngineConfig};
+use elara_time::{TimeEngine, TimeEngineConfig};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -91,7 +91,12 @@ pub struct SimulatedNode {
 }
 
 impl SimulatedNode {
-    pub fn new(node_id: NodeId, config: TimeEngineConfig, drift: ClockDriftModel, seed: u64) -> Self {
+    pub fn new(
+        node_id: NodeId,
+        config: TimeEngineConfig,
+        drift: ClockDriftModel,
+        seed: u64,
+    ) -> Self {
         SimulatedNode {
             node_id,
             time_engine: TimeEngine::with_config(config),
@@ -104,8 +109,8 @@ impl SimulatedNode {
     /// Advance the node's time by one tick
     pub fn tick(&mut self, real_dt: Duration) {
         // Apply drift to get local perception of time
-        let local_dt = self.drift_model.apply(real_dt, &mut self.rng);
-        
+        let _local_dt = self.drift_model.apply(real_dt, &mut self.rng);
+
         // Advance time engine (it uses its own internal tick)
         self.time_engine.tick();
         self.tick_count += 1;
@@ -113,12 +118,12 @@ impl SimulatedNode {
 
     /// Get current perceptual time
     pub fn tau_p(&self) -> PerceptualTime {
-        self.time_engine.τp()
+        self.time_engine.tau_p()
     }
 
     /// Get current state time
     pub fn tau_s(&self) -> StateTime {
-        self.time_engine.τs()
+        self.time_engine.tau_s()
     }
 
     /// Get reality window
@@ -149,8 +154,6 @@ pub struct TimeSimulator {
     tick_interval: Duration,
     /// RNG seed counter
     seed_counter: u64,
-    /// Default chaos config
-    default_chaos: ChaosConfig,
 }
 
 impl TimeSimulator {
@@ -162,7 +165,6 @@ impl TimeSimulator {
             global_time: Duration::ZERO,
             tick_interval,
             seed_counter: 0,
-            default_chaos: ChaosConfig::default(),
         }
     }
 
@@ -176,12 +178,7 @@ impl TimeSimulator {
         let seed = self.seed_counter;
         self.seed_counter += 1;
 
-        let node = SimulatedNode::new(
-            node_id,
-            TimeEngineConfig::default(),
-            drift,
-            seed,
-        );
+        let node = SimulatedNode::new(node_id, TimeEngineConfig::default(), drift, seed);
         self.nodes.insert(node_id, node);
     }
 
@@ -189,7 +186,8 @@ impl TimeSimulator {
     pub fn set_network(&mut self, from: NodeId, to: NodeId, config: ChaosConfig) {
         let seed = self.seed_counter;
         self.seed_counter += 1;
-        self.networks.insert((from, to), ChaosNetwork::with_seed(config, seed));
+        self.networks
+            .insert((from, to), ChaosNetwork::with_seed(config, seed));
     }
 
     /// Run simulation for a duration
@@ -236,7 +234,6 @@ impl TimeSimulator {
                 if let Some(sender_time) = sender_time {
                     // Update receiver's network model
                     if let Some(receiver) = self.nodes.get_mut(to) {
-                        let local_time = receiver.tau_s();
                         receiver.time_engine.update_from_packet(
                             *from,
                             sender_time,
@@ -302,7 +299,7 @@ impl SimulationResult {
                     let t1 = nodes[i].tau_s().as_micros();
                     let t2 = nodes[j].tau_s().as_micros();
                     let divergence = (t1 - t2).abs();
-                    
+
                     self.divergence_samples.push(divergence);
                     self.max_divergence_us = self.max_divergence_us.max(divergence);
                 }
@@ -352,7 +349,7 @@ pub mod scenarios {
     /// Small swarm with varying clock quality
     pub fn small_swarm(count: usize) -> TimeSimulator {
         let mut sim = TimeSimulator::new(Duration::from_millis(10));
-        
+
         for i in 0..count {
             let drift = match i % 4 {
                 0 => ClockDriftModel::perfect(),
@@ -369,16 +366,16 @@ pub mod scenarios {
     /// Hostile network scenario
     pub fn hostile_network() -> TimeSimulator {
         let mut sim = TimeSimulator::new(Duration::from_millis(10));
-        
+
         let node1 = NodeId::new(1);
         let node2 = NodeId::new(2);
-        
+
         sim.add_node_with_drift(node1, ClockDriftModel::unstable());
         sim.add_node_with_drift(node2, ClockDriftModel::unstable());
-        
+
         sim.set_network(node1, node2, ChaosConfig::hostile());
         sim.set_network(node2, node1, ChaosConfig::hostile());
-        
+
         sim
     }
 }
@@ -393,7 +390,10 @@ mod tests {
         let mut result = sim.run(Duration::from_secs(10));
         result.finalize();
 
-        println!("Perfect clocks - Max divergence: {:.3}ms", result.max_divergence_ms());
+        println!(
+            "Perfect clocks - Max divergence: {:.3}ms",
+            result.max_divergence_ms()
+        );
         // Perfect clocks should have minimal divergence
         assert!(result.max_divergence_ms() < 100.0);
     }
@@ -404,7 +404,10 @@ mod tests {
         let mut result = sim.run(Duration::from_secs(60));
         result.finalize();
 
-        println!("Drifting clocks - Max divergence: {:.3}ms", result.max_divergence_ms());
+        println!(
+            "Drifting clocks - Max divergence: {:.3}ms",
+            result.max_divergence_ms()
+        );
         // Drifting clocks will diverge but time engine should limit it
     }
 
@@ -414,8 +417,11 @@ mod tests {
         let mut result = sim.run(Duration::from_secs(30));
         result.finalize();
 
-        println!("Small swarm - Max divergence: {:.3}ms, Avg: {:.3}ms",
-            result.max_divergence_ms(), result.avg_divergence_ms());
+        println!(
+            "Small swarm - Max divergence: {:.3}ms, Avg: {:.3}ms",
+            result.max_divergence_ms(),
+            result.avg_divergence_ms()
+        );
     }
 
     #[test]
@@ -443,6 +449,7 @@ mod tests {
 
         // Current time should be in Current position
         let current = node.tau_s();
+        assert!(rw.contains(current));
         assert_eq!(node.classify(current), TimePosition::Current);
 
         // Far past should be TooLate

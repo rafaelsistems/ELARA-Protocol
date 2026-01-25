@@ -1,7 +1,6 @@
 //! Network model for passive jitter/latency estimation
 
 use std::collections::HashMap;
-use std::time::Duration;
 
 use elara_core::NodeId;
 
@@ -44,7 +43,9 @@ impl PeerNetworkModel {
         // Update estimates
         if self.samples.len() >= 5 {
             self.offset = Self::median(&self.samples);
-            self.jitter_envelope = self.samples.iter()
+            self.jitter_envelope = self
+                .samples
+                .iter()
                 .map(|s| (s - self.offset).abs())
                 .fold(0.0, f64::max);
         }
@@ -54,7 +55,7 @@ impl PeerNetworkModel {
         let mut sorted = values.to_vec();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
         let mid = sorted.len() / 2;
-        if sorted.len() % 2 == 0 {
+        if sorted.len().is_multiple_of(2) {
             (sorted[mid - 1] + sorted[mid]) / 2.0
         } else {
             sorted[mid]
@@ -91,7 +92,13 @@ impl NetworkModel {
     }
 
     /// Update model from a received packet
-    pub fn update_from_packet(&mut self, peer: NodeId, local_time: f64, remote_time: f64, seq: u16) {
+    pub fn update_from_packet(
+        &mut self,
+        peer: NodeId,
+        local_time: f64,
+        remote_time: f64,
+        _seq: u16,
+    ) {
         let peer_model = self.peers.entry(peer).or_default();
         peer_model.update(local_time, remote_time);
 

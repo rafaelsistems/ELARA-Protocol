@@ -10,7 +10,7 @@
 //! This module provides the scientific foundations of ELARA.
 
 use std::fmt;
-use std::ops::{BitOr, BitAnd};
+use std::ops::BitOr;
 
 // ============================================================================
 // I. NODE ONTOLOGY
@@ -219,7 +219,13 @@ pub struct PresenceVector {
 
 impl PresenceVector {
     /// Create a new presence vector
-    pub fn new(liveness: f32, immediacy: f32, coherence: f32, relational: f32, emotional: f32) -> Self {
+    pub fn new(
+        liveness: f32,
+        immediacy: f32,
+        coherence: f32,
+        relational: f32,
+        emotional: f32,
+    ) -> Self {
         Self {
             liveness: liveness.clamp(0.0, 1.0),
             immediacy: immediacy.clamp(0.0, 1.0),
@@ -246,8 +252,12 @@ impl PresenceVector {
 
     /// Calculate overall presence score [0.0 - 1.0]
     pub fn score(&self) -> f32 {
-        (self.liveness + self.immediacy + self.coherence
-            + self.relational_continuity + self.emotional_bandwidth) / 5.0
+        (self.liveness
+            + self.immediacy
+            + self.coherence
+            + self.relational_continuity
+            + self.emotional_bandwidth)
+            / 5.0
     }
 
     /// Check if presence is alive (any component > 0)
@@ -310,6 +320,7 @@ impl fmt::Display for PresenceVector {
 ///
 /// ELARA defines an official degradation ladder. No improvisation per engineer.
 /// There is no "disconnected" - only the most minimal form of reality.
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum DegradationLevel {

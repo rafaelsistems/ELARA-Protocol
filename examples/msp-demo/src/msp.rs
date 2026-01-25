@@ -4,22 +4,17 @@ use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Instant;
 
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 
-use elara_core::{DegradationLevel, NodeId, PresenceVector};
+use elara_core::{DegradationLevel, PresenceVector};
 
 /// Peer information
 #[derive(Clone, Debug)]
 struct Peer {
     name: String,
-    presence: PresenceVector,
-    degradation: DegradationLevel,
     voice_active: bool,
-    typing: bool,
-    last_seen: Instant,
 }
 
 /// Node state
@@ -30,7 +25,6 @@ struct NodeState {
     presence: PresenceVector,
     degradation: DegradationLevel,
     voice_active: bool,
-    typing: bool,
 }
 
 impl NodeState {
@@ -42,7 +36,6 @@ impl NodeState {
             presence: PresenceVector::full(),
             degradation: DegradationLevel::L0_FullPerception,
             voice_active: false,
-            typing: false,
         }
     }
 }
@@ -89,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    
+
     println!("\nListening on port {}", port);
     if initial_peer.is_none() {
         println!("Waiting for connections... Share: 127.0.0.1:{}", port);
@@ -112,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let peer_addr_recv = peer_addr.clone();
     let state_recv = state.clone();
     let my_name = name.clone();
-    
+
     tokio::spawn(async move {
         let mut buf = [0u8; 1500];
         loop {
@@ -120,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Ok((len, from)) => {
                     let msg = String::from_utf8_lossy(&buf[..len]);
                     let parts: Vec<&str> = msg.splitn(3, ':').collect();
-                    
+
                     if parts.is_empty() {
                         continue;
                     }
@@ -128,49 +121,47 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     match parts[0] {
                         "JOIN" if parts.len() >= 2 => {
                             let peer_name = parts[1].to_string();
-                            
+
                             // Add peer
                             {
                                 let mut s = state_recv.lock().await;
                                 let is_new = !s.peers.contains_key(&from);
-                                
-                                s.peers.insert(from, Peer {
-                                    name: peer_name.clone(),
-                                    presence: PresenceVector::full(),
-                                    degradation: DegradationLevel::L0_FullPerception,
-                                    voice_active: false,
-                                    typing: false,
-                                    last_seen: Instant::now(),
-                                });
-                                
+
+                                s.peers.insert(
+                                    from,
+                                    Peer {
+                                        name: peer_name.clone(),
+                                        voice_active: false,
+                                    },
+                                );
+
                                 if is_new {
                                     println!("\n✅ {} joined from {}", peer_name, from);
                                     print!("> ");
                                     let _ = io::stdout().flush();
-                                    
+
                                     // Send welcome back
                                     let welcome = format!("WELCOME:{}:{:016x}", my_name, s.node_id);
                                     let _ = socket_recv.send_to(welcome.as_bytes(), from).await;
                                 }
                             }
-                            
+
                             *peer_addr_recv.lock().await = Some(from);
                         }
                         "WELCOME" if parts.len() >= 2 => {
                             let peer_name = parts[1].to_string();
-                            
+
                             {
                                 let mut s = state_recv.lock().await;
-                                s.peers.insert(from, Peer {
-                                    name: peer_name.clone(),
-                                    presence: PresenceVector::full(),
-                                    degradation: DegradationLevel::L0_FullPerception,
-                                    voice_active: false,
-                                    typing: false,
-                                    last_seen: Instant::now(),
-                                });
+                                s.peers.insert(
+                                    from,
+                                    Peer {
+                                        name: peer_name.clone(),
+                                        voice_active: false,
+                                    },
+                                );
                             }
-                            
+
                             *peer_addr_recv.lock().await = Some(from);
                             println!("\n✅ Connected to {}", peer_name);
                             print!("> ");
@@ -185,7 +176,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "TYPING" if parts.len() >= 3 => {
                             let peer_name = parts[1];
                             let typing = parts[2] == "1";
-                            
+
                             if typing {
                                 println!("\n✏️  {} is typing...", peer_name);
                                 print!("> ");
@@ -195,7 +186,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         "VOICE" if parts.len() >= 3 => {
                             let peer_name = parts[1];
                             let energy: u8 = parts[2].parse().unwrap_or(0);
-                            
+
                             if energy > 0 {
                                 let bars = "█".repeat((energy / 25) as usize);
                                 println!("\n🎤 {} speaking: [{}]", peer_name, bars);
@@ -261,7 +252,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for line in stdin.lock().lines() {
         let line = line?;
         let line = line.trim();
-        
+
         if line.is_empty() {
             print!("> ");
             io::stdout().flush()?;
@@ -273,18 +264,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let peer = *peer_addr.lock().await;
-        
+
         match line {
             "/voice" => {
                 let mut s = state.lock().await;
                 s.voice_active = !s.voice_active;
                 let energy = if s.voice_active { 200u8 } else { 0u8 };
-                
+
                 if let Some(addr) = peer {
                     let msg = format!("VOICE:{}:{}", s.name, energy);
                     socket.send_to(msg.as_bytes(), addr).await?;
                 }
-                
+
                 if s.voice_active {
                     println!("🎤 Voice ON - speaking...");
                 } else {
@@ -296,43 +287,64 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("┌─────────────────────────────────────┐");
                 println!("│         Presence Vector             │");
                 println!("├─────────────────────────────────────┤");
-                println!("│ Liveness:     {:.0}%                  │", s.presence.liveness * 100.0);
-                println!("│ Immediacy:    {:.0}%                  │", s.presence.immediacy * 100.0);
-                println!("│ Coherence:    {:.0}%                  │", s.presence.coherence * 100.0);
-                println!("│ Relational:   {:.0}%                  │", s.presence.relational_continuity * 100.0);
-                println!("│ Emotional:    {:.0}%                  │", s.presence.emotional_bandwidth * 100.0);
+                println!(
+                    "│ Liveness:     {:.0}%                  │",
+                    s.presence.liveness * 100.0
+                );
+                println!(
+                    "│ Immediacy:    {:.0}%                  │",
+                    s.presence.immediacy * 100.0
+                );
+                println!(
+                    "│ Coherence:    {:.0}%                  │",
+                    s.presence.coherence * 100.0
+                );
+                println!(
+                    "│ Relational:   {:.0}%                  │",
+                    s.presence.relational_continuity * 100.0
+                );
+                println!(
+                    "│ Emotional:    {:.0}%                  │",
+                    s.presence.emotional_bandwidth * 100.0
+                );
                 println!("├─────────────────────────────────────┤");
-                println!("│ Overall Score: {:.0}%                 │", s.presence.score() * 100.0);
+                println!(
+                    "│ Overall Score: {:.0}%                 │",
+                    s.presence.score() * 100.0
+                );
                 println!("└─────────────────────────────────────┘");
             }
             "/degrade" => {
                 let mut s = state.lock().await;
-                let new_level = s.degradation.degrade().unwrap_or(DegradationLevel::L5_LatentPresence);
+                let new_level = s
+                    .degradation
+                    .degrade()
+                    .unwrap_or(DegradationLevel::L5_LatentPresence);
                 s.degradation = new_level;
-                
+
                 // Update presence based on degradation
                 let factor = 1.0 - (new_level.level() as f32 * 0.15);
                 s.presence = PresenceVector::new(factor, factor, factor, factor, factor);
-                
+
                 let level_num = new_level.level();
-                
+
                 if let Some(addr) = peer {
                     let msg = format!("DEGRADE:{}:{}", s.name, level_num);
                     socket.send_to(msg.as_bytes(), addr).await?;
                 }
-                
+
                 print_degradation_ladder(new_level);
             }
             "/recover" => {
                 let mut s = state.lock().await;
                 s.degradation = DegradationLevel::L0_FullPerception;
                 s.presence = PresenceVector::full();
-                
+
                 if let Some(addr) = peer {
                     let msg = format!("DEGRADE:{}:0", s.name);
                     socket.send_to(msg.as_bytes(), addr).await?;
                 }
-                
+
                 println!("✅ Recovered to L0: Full Perception");
                 print_degradation_ladder(DegradationLevel::L0_FullPerception);
             }
@@ -344,7 +356,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("│ Name: {}                            ", s.name);
                 println!("│ Node ID: {:016x}        ", s.node_id);
                 println!("│ Degradation: {:?}      ", s.degradation);
-                println!("│ Voice: {}                           ", if s.voice_active { "ON" } else { "OFF" });
+                println!(
+                    "│ Voice: {}                           ",
+                    if s.voice_active { "ON" } else { "OFF" }
+                );
                 println!("│ Peers: {}                           ", s.peers.len());
                 println!("└─────────────────────────────────────┘");
             }
@@ -355,9 +370,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     println!("Connected peers:");
                     for (addr, peer) in &s.peers {
-                        println!("  - {} @ {} (voice: {})", 
-                            peer.name, addr, 
-                            if peer.voice_active { "ON" } else { "OFF" });
+                        println!(
+                            "  - {} @ {} (voice: {})",
+                            peer.name,
+                            addr,
+                            if peer.voice_active { "ON" } else { "OFF" }
+                        );
                     }
                 }
             }
@@ -384,7 +402,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
-        
+
         print!("> ");
         io::stdout().flush()?;
     }
@@ -397,22 +415,34 @@ fn print_degradation_ladder(current: DegradationLevel) {
     println!("┌─────────────────────────────────────────────────────────┐");
     println!("│              Degradation Ladder                         │");
     println!("├─────────────────────────────────────────────────────────┤");
-    
+
     let levels = [
-        (DegradationLevel::L0_FullPerception, "L0: Full Perception", 20),
-        (DegradationLevel::L1_DistortedPerception, "L1: Distorted", 16),
-        (DegradationLevel::L2_FragmentedPerception, "L2: Fragmented", 12),
+        (
+            DegradationLevel::L0_FullPerception,
+            "L0: Full Perception",
+            20,
+        ),
+        (
+            DegradationLevel::L1_DistortedPerception,
+            "L1: Distorted",
+            16,
+        ),
+        (
+            DegradationLevel::L2_FragmentedPerception,
+            "L2: Fragmented",
+            12,
+        ),
         (DegradationLevel::L3_SymbolicPresence, "L3: Symbolic", 8),
         (DegradationLevel::L4_MinimalPresence, "L4: Minimal", 4),
         (DegradationLevel::L5_LatentPresence, "L5: Latent", 2),
     ];
-    
+
     for (level, name, bars) in levels {
         let marker = if level == current { "→" } else { " " };
         let bar = "█".repeat(bars);
         let empty = "░".repeat(20 - bars);
         println!("│ {} {:20} [{}{}] │", marker, name, bar, empty);
     }
-    
+
     println!("└─────────────────────────────────────────────────────────┘");
 }

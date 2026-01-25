@@ -38,9 +38,9 @@ impl From<ElaraErrorCode> for c_int {
     }
 }
 
-/// Thread-local last error message
 thread_local! {
-    static LAST_ERROR: std::cell::RefCell<Option<CString>> = std::cell::RefCell::new(None);
+    static LAST_ERROR: std::cell::RefCell<Option<CString>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Set the last error message
@@ -54,11 +54,9 @@ pub fn set_last_error(msg: &str) {
 /// Returns NULL if no error
 #[no_mangle]
 pub extern "C" fn elara_get_last_error() -> *const c_char {
-    LAST_ERROR.with(|e| {
-        match e.borrow().as_ref() {
-            Some(s) => s.as_ptr(),
-            None => std::ptr::null(),
-        }
+    LAST_ERROR.with(|e| match e.borrow().as_ref() {
+        Some(s) => s.as_ptr(),
+        None => std::ptr::null(),
     })
 }
 

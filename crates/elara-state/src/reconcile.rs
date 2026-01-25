@@ -1,8 +1,7 @@
 //! State reconciliation pipeline
 
 use elara_core::{
-    AuthorityScope, Event, EventResult, NodeId, RejectReason, StateAtom, StateId, StateTime,
-    StateType, TimePosition, VersionVector,
+    AuthorityScope, Event, EventResult, RejectReason, StateAtom, StateTime, StateType, TimePosition,
 };
 use elara_time::TimeEngine;
 
@@ -79,13 +78,13 @@ impl ReconciliationEngine {
             self.field.quarantine(
                 vec![], // Would serialize event here
                 vec![event.target_state],
-                time_engine.τs(),
+                time_engine.tau_s(),
             );
             return EventResult::Rejected(RejectReason::CausalityViolation);
         }
 
         // Stage 3: Temporal Placement
-        let τ_event = event.absolute_time(time_engine.τs());
+        let τ_event = event.absolute_time(time_engine.tau_s());
         let position = time_engine.classify_time(τ_event);
 
         // Stage 4: Handle based on temporal position
@@ -96,11 +95,11 @@ impl ReconciliationEngine {
                 EventResult::LateCorrected
             }
             TimePosition::Current => {
-                self.apply_event(&event, time_engine.τs());
+                self.apply_event(&event, time_engine.tau_s());
                 EventResult::Applied
             }
             TimePosition::Predictable => {
-                self.replace_prediction(&event, time_engine.τs());
+                self.replace_prediction(&event, time_engine.tau_s());
                 EventResult::Merged
             }
             TimePosition::TooEarly => {
@@ -113,7 +112,8 @@ impl ReconciliationEngine {
     /// Check if event source has authority over target state
     fn check_authority(&self, event: &Event) -> bool {
         if let Some(atom) = self.field.get(event.target_state) {
-            atom.authority.has_authority(event.source, &AuthorityScope::Full)
+            atom.authority
+                .has_authority(event.source, &AuthorityScope::Full)
         } else {
             // New state - source becomes owner
             true
@@ -170,13 +170,13 @@ impl ReconciliationEngine {
 
     /// Apply late correction with blending
     fn apply_late_correction(&mut self, event: &Event, time_engine: &TimeEngine) {
-        let τ_event = event.absolute_time(time_engine.τs());
-        let delay = time_engine.τs() - τ_event;
+        let τ_event = event.absolute_time(time_engine.tau_s());
+        let delay = time_engine.tau_s() - τ_event;
         let weight = time_engine.correction_weight(delay);
 
         if weight > 0.1 {
             // Apply with reduced weight
-            self.apply_event(event, time_engine.τs());
+            self.apply_event(event, time_engine.tau_s());
         }
     }
 
@@ -218,7 +218,7 @@ impl Default for ReconciliationEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use elara_core::{Event, EventType, MutationOp};
+    use elara_core::{Event, EventType, MutationOp, NodeId, StateId};
 
     #[test]
     fn test_reconciliation_basic() {

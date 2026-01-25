@@ -1,3 +1,4 @@
+#![allow(mixed_script_confusables, non_snake_case)]
 //! ELARA Time Engine - Dual clock system and temporal control
 //!
 //! This crate implements the Time Engine:
@@ -8,9 +9,9 @@
 //! - Prediction and correction loops
 
 pub mod clock;
-pub mod network;
 pub mod engine;
+pub mod network;
 
 pub use clock::*;
-pub use network::*;
 pub use engine::*;
+pub use network::*;

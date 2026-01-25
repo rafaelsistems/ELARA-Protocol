@@ -22,12 +22,12 @@
 
 pub mod authority;
 pub mod interest;
-pub mod topology;
 pub mod propagation;
 pub mod swarm;
+pub mod topology;
 
 pub use authority::*;
 pub use interest::*;
-pub use topology::*;
 pub use propagation::*;
 pub use swarm::*;
+pub use topology::*;

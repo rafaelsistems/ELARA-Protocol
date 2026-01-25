@@ -19,18 +19,18 @@
 //! - L4: Minimal visual (static avatar + activity)
 //! - L5: Latent visual (last known state)
 
-pub mod state;
-pub mod face;
-pub mod pose;
-pub mod scene;
-pub mod keyframe;
-pub mod prediction;
 pub mod encoding;
+pub mod face;
+pub mod keyframe;
+pub mod pose;
+pub mod prediction;
+pub mod scene;
+pub mod state;
 
-pub use state::*;
-pub use face::*;
-pub use pose::*;
-pub use scene::*;
-pub use keyframe::*;
-pub use prediction::*;
 pub use encoding::*;
+pub use face::*;
+pub use keyframe::*;
+pub use pose::*;
+pub use prediction::*;
+pub use scene::*;
+pub use state::*;

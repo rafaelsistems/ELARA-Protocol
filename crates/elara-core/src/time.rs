@@ -184,26 +184,26 @@ pub struct RealityWindow {
     /// Current state time
     pub τs: StateTime,
     /// Correction horizon (how far back we can correct)
-    pub Hc: Duration,
+    pub hc: Duration,
     /// Prediction horizon (how far ahead we predict)
-    pub Hp: Duration,
+    pub hp: Duration,
 }
 
 impl RealityWindow {
-    pub fn new(τs: StateTime, Hc: Duration, Hp: Duration) -> Self {
-        RealityWindow { τs, Hc, Hp }
+    pub fn new(τs: StateTime, hc: Duration, hp: Duration) -> Self {
+        RealityWindow { τs, hc, hp }
     }
 
     /// Left bound of reality window (oldest correctable time)
     #[inline]
     pub fn left(&self) -> StateTime {
-        self.τs.saturating_sub(self.Hc)
+        self.τs.saturating_sub(self.hc)
     }
 
     /// Right bound of reality window (furthest predicted time)
     #[inline]
     pub fn right(&self) -> StateTime {
-        self.τs.saturating_add(self.Hp)
+        self.τs.saturating_add(self.hp)
     }
 
     /// Check if a time is within the reality window
@@ -279,10 +279,10 @@ mod tests {
     fn test_state_time_wire_roundtrip() {
         let reference = StateTime::from_millis(1000);
         let time = StateTime::from_millis(1050);
-        
+
         let offset = time.to_wire_offset(reference);
         let recovered = StateTime::from_wire_offset(reference, offset);
-        
+
         // Should be within 100μs precision
         assert!((time.0 - recovered.0).abs() < 100);
     }
@@ -290,31 +290,46 @@ mod tests {
     #[test]
     fn test_reality_window_classification() {
         let τs = StateTime::from_millis(1000);
-        let Hc = Duration::from_millis(100);
-        let Hp = Duration::from_millis(50);
-        let rw = RealityWindow::new(τs, Hc, Hp);
+        let hc = Duration::from_millis(100);
+        let hp = Duration::from_millis(50);
+        let rw = RealityWindow::new(τs, hc, hp);
 
         // Too late (before Hc)
-        assert_eq!(rw.classify(StateTime::from_millis(850)), TimePosition::TooLate);
-        
+        assert_eq!(
+            rw.classify(StateTime::from_millis(850)),
+            TimePosition::TooLate
+        );
+
         // Correctable (within Hc)
-        assert_eq!(rw.classify(StateTime::from_millis(950)), TimePosition::Correctable);
-        
+        assert_eq!(
+            rw.classify(StateTime::from_millis(950)),
+            TimePosition::Correctable
+        );
+
         // Current (at τs)
-        assert_eq!(rw.classify(StateTime::from_millis(1000)), TimePosition::Current);
-        
+        assert_eq!(
+            rw.classify(StateTime::from_millis(1000)),
+            TimePosition::Current
+        );
+
         // Predictable (within Hp)
-        assert_eq!(rw.classify(StateTime::from_millis(1030)), TimePosition::Predictable);
-        
+        assert_eq!(
+            rw.classify(StateTime::from_millis(1030)),
+            TimePosition::Predictable
+        );
+
         // Too early (beyond Hp)
-        assert_eq!(rw.classify(StateTime::from_millis(1100)), TimePosition::TooEarly);
+        assert_eq!(
+            rw.classify(StateTime::from_millis(1100)),
+            TimePosition::TooEarly
+        );
     }
 
     #[test]
     fn test_perceptual_time_monotonic() {
         let t1 = PerceptualTime::from_millis(100);
         let t2 = t1 + Duration::from_millis(10);
-        
+
         assert!(t2 > t1);
         assert_eq!(t2 - t1, Duration::from_millis(10));
     }

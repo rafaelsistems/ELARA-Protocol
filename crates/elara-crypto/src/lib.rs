@@ -9,14 +9,14 @@
 //! - Replay protection
 //! - Secure frame encryption/decryption
 
-pub mod identity;
 pub mod aead;
+pub mod identity;
 pub mod ratchet;
 pub mod replay;
 pub mod secure_frame;
 
-pub use identity::*;
 pub use aead::*;
+pub use identity::*;
 pub use ratchet::*;
 pub use replay::*;
 pub use secure_frame::*;

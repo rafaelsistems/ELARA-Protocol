@@ -1,20 +1,20 @@
+#![allow(clippy::missing_safety_doc)]
 //! ELARA FFI - Foreign Function Interface
 //!
 //! C-compatible bindings for mobile SDKs (Android/iOS).
 //! This crate provides a stable ABI for Kotlin and Swift wrappers.
 
-pub mod types;
+pub mod error;
 pub mod identity;
 pub mod session;
-pub mod error;
+pub mod types;
 
-use std::ffi::{c_char, c_int, c_void, CStr, CString};
-use std::ptr;
+use std::ffi::{c_char, c_int, CString};
 
-pub use types::*;
+pub use error::*;
 pub use identity::*;
 pub use session::*;
-pub use error::*;
+pub use types::*;
 
 /// Library version
 #[no_mangle]
@@ -41,20 +41,16 @@ pub extern "C" fn elara_shutdown() {
 
 /// Free a string allocated by ELARA
 #[no_mangle]
-pub extern "C" fn elara_free_string(s: *mut c_char) {
+pub unsafe extern "C" fn elara_free_string(s: *mut c_char) {
     if !s.is_null() {
-        unsafe {
-            drop(CString::from_raw(s));
-        }
+        drop(CString::from_raw(s));
     }
 }
 
 /// Free a byte buffer allocated by ELARA
 #[no_mangle]
-pub extern "C" fn elara_free_bytes(ptr: *mut u8, len: usize) {
+pub unsafe extern "C" fn elara_free_bytes(ptr: *mut u8, len: usize) {
     if !ptr.is_null() {
-        unsafe {
-            drop(Vec::from_raw_parts(ptr, len, len));
-        }
+        drop(Vec::from_raw_parts(ptr, len, len));
     }
 }

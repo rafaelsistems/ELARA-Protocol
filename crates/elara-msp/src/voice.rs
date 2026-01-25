@@ -1,7 +1,7 @@
 //! MSP Voice Profile - profile:voice-minimal implementation
 //!
 //! Voice state atom: ω:voice:user_id
-//! 
+//!
 //! Voice is NOT audio PCM - it's STATE OF SPEECH:
 //! - voiced/unvoiced flag
 //! - pitch (quantized)
@@ -9,7 +9,9 @@
 //! - spectral envelope index
 //! - residual noise seed
 
-use elara_core::{DeltaLaw, InterpolationType, NodeId, StateAtom, StateBounds, StateId, StateTime, StateType};
+use elara_core::{
+    DeltaLaw, InterpolationType, NodeId, StateAtom, StateBounds, StateId, StateTime, StateType,
+};
 
 /// State type prefix for voice
 pub const STATE_TYPE_VOICE: u16 = 0x0010;
@@ -136,7 +138,11 @@ impl VoiceFrame {
 
         VoiceFrame {
             // Voiced: threshold at 0.5
-            voiced: if weight > 0.5 { other.voiced } else { self.voiced },
+            voiced: if weight > 0.5 {
+                other.voiced
+            } else {
+                self.voiced
+            },
             // Pitch: linear interpolation
             pitch: ((self.pitch as f32 * inv_w) + (other.pitch as f32 * w)) as u8,
             // Energy: linear interpolation
@@ -223,7 +229,8 @@ impl VoiceState {
         if self.history.len() >= 2 {
             let recent: Vec<u8> = self.history.iter().rev().take(5).map(|f| f.pitch).collect();
             if recent.len() >= 2 {
-                let slope = (recent[0] as f32 - recent[recent.len() - 1] as f32) / recent.len() as f32;
+                let slope =
+                    (recent[0] as f32 - recent[recent.len() - 1] as f32) / recent.len() as f32;
                 let extrapolated = recent[0] as f32 + slope * self.prediction_depth as f32;
 
                 // Damping toward mean (128)
@@ -431,9 +438,15 @@ mod tests {
 
         let mut state = VoiceState::new(NodeId::new(1));
         state.prediction_depth = 10;
-        assert_eq!(state.degradation_level(), VoiceDegradationLevel::ParameterOnly);
+        assert_eq!(
+            state.degradation_level(),
+            VoiceDegradationLevel::ParameterOnly
+        );
 
         state.prediction_depth = 50;
-        assert_eq!(state.degradation_level(), VoiceDegradationLevel::PresenceOnly);
+        assert_eq!(
+            state.degradation_level(),
+            VoiceDegradationLevel::PresenceOnly
+        );
     }
 }

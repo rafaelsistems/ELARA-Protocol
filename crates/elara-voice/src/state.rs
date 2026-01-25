@@ -84,31 +84,31 @@ impl Default for PitchContour {
 pub struct VoiceState {
     /// Unique identifier
     pub id: VoiceStateId,
-    
+
     /// Source node (speaker)
     pub source: NodeId,
-    
+
     /// Timestamp
     pub timestamp: StateTime,
-    
+
     /// Sequence number
     pub sequence: u64,
-    
+
     /// Voice activity
     pub activity: VoiceActivity,
-    
+
     /// Is this a keyframe?
     pub is_keyframe: bool,
-    
+
     /// Reference to keyframe (for deltas)
     pub keyframe_ref: Option<VoiceStateId>,
-    
+
     /// Current degradation level
     pub degradation: DegradationLevel,
-    
+
     /// Parametric voice data (None if silent)
     pub params: Option<VoiceParams>,
-    
+
     /// Confidence in this state [0.0 - 1.0]
     pub confidence: f32,
 }
@@ -129,9 +129,14 @@ impl VoiceState {
             confidence: 1.0,
         }
     }
-    
+
     /// Create a speaking voice state
-    pub fn speaking(source: NodeId, timestamp: StateTime, sequence: u64, params: VoiceParams) -> Self {
+    pub fn speaking(
+        source: NodeId,
+        timestamp: StateTime,
+        sequence: u64,
+        params: VoiceParams,
+    ) -> Self {
         Self {
             id: VoiceStateId::new(sequence),
             source,
@@ -145,9 +150,14 @@ impl VoiceState {
             confidence: 1.0,
         }
     }
-    
+
     /// Create a delta (non-keyframe)
-    pub fn delta(source: NodeId, timestamp: StateTime, sequence: u64, keyframe: VoiceStateId) -> Self {
+    pub fn delta(
+        source: NodeId,
+        timestamp: StateTime,
+        sequence: u64,
+        keyframe: VoiceStateId,
+    ) -> Self {
         Self {
             id: VoiceStateId::new(sequence),
             source,
@@ -161,52 +171,55 @@ impl VoiceState {
             confidence: 1.0,
         }
     }
-    
+
     /// Set voice parameters
     pub fn with_params(mut self, params: VoiceParams) -> Self {
         self.params = Some(params);
         self.activity = VoiceActivity::Speaking;
         self
     }
-    
+
     /// Set activity
     pub fn with_activity(mut self, activity: VoiceActivity) -> Self {
         self.activity = activity;
         self
     }
-    
+
     /// Apply degradation
     pub fn degrade(&mut self, level: DegradationLevel) {
         self.degradation = level;
-        
+
         if let Some(ref mut params) = self.params {
             params.degrade(level);
         }
-        
+
         // At L3+, we only keep activity indicator
         if level >= DegradationLevel::L3_SymbolicPresence {
             self.params = None;
         }
     }
-    
+
     /// Check if speaking
     pub fn is_speaking(&self) -> bool {
-        matches!(self.activity, VoiceActivity::Speaking | VoiceActivity::Laughing | VoiceActivity::Crying)
+        matches!(
+            self.activity,
+            VoiceActivity::Speaking | VoiceActivity::Laughing | VoiceActivity::Crying
+        )
     }
-    
+
     /// Interpolate between two voice states
     pub fn lerp(&self, other: &VoiceState, t: f32) -> VoiceState {
         let t = t.clamp(0.0, 1.0);
-        
+
         let mut result = if t < 0.5 { self.clone() } else { other.clone() };
-        
+
         // Interpolate params if both have them
         if let (Some(p1), Some(p2)) = (&self.params, &other.params) {
             result.params = Some(p1.lerp(p2, t));
         }
-        
+
         result.confidence = self.confidence * (1.0 - t) + other.confidence * t;
-        
+
         result
     }
 }
@@ -216,31 +229,31 @@ impl VoiceState {
 pub struct VoiceParams {
     /// Fundamental frequency (pitch) in Hz [50 - 500]
     pub pitch: f32,
-    
+
     /// Pitch variation/jitter
     pub pitch_variation: f32,
-    
+
     /// Energy/loudness [0.0 - 1.0]
     pub energy: f32,
-    
+
     /// Spectral envelope (formants) - simplified to 4 formants
     pub formants: [Formant; 4],
-    
+
     /// Voicing ratio [0.0 = unvoiced, 1.0 = fully voiced]
     pub voicing: f32,
-    
+
     /// Speech rate multiplier [0.5 - 2.0]
     pub rate: f32,
-    
+
     /// Pitch contour
     pub contour: PitchContour,
-    
+
     /// Emotion affecting prosody
     pub emotion: SpeechEmotion,
-    
+
     /// Breathiness [0.0 - 1.0]
     pub breathiness: f32,
-    
+
     /// Nasality [0.0 - 1.0]
     pub nasality: f32,
 }
@@ -253,10 +266,10 @@ impl VoiceParams {
             pitch_variation: 0.1,
             energy: 0.5,
             formants: [
-                Formant::new(500.0, 100.0, 1.0),   // F1
-                Formant::new(1500.0, 150.0, 0.8),  // F2
-                Formant::new(2500.0, 200.0, 0.6),  // F3
-                Formant::new(3500.0, 250.0, 0.4),  // F4
+                Formant::new(500.0, 100.0, 1.0),  // F1
+                Formant::new(1500.0, 150.0, 0.8), // F2
+                Formant::new(2500.0, 200.0, 0.6), // F3
+                Formant::new(3500.0, 250.0, 0.4), // F4
             ],
             voicing: 1.0,
             rate: 1.0,
@@ -266,7 +279,7 @@ impl VoiceParams {
             nasality: 0.1,
         }
     }
-    
+
     /// Create female voice parameters
     pub fn female() -> Self {
         Self {
@@ -287,7 +300,7 @@ impl VoiceParams {
             nasality: 0.1,
         }
     }
-    
+
     /// Apply degradation
     pub fn degrade(&mut self, level: DegradationLevel) {
         match level {
@@ -313,12 +326,12 @@ impl VoiceParams {
             }
         }
     }
-    
+
     /// Interpolate between two parameter sets
     pub fn lerp(&self, other: &VoiceParams, t: f32) -> VoiceParams {
         let t = t.clamp(0.0, 1.0);
         let inv = 1.0 - t;
-        
+
         VoiceParams {
             pitch: self.pitch * inv + other.pitch * t,
             pitch_variation: self.pitch_variation * inv + other.pitch_variation * t,
@@ -337,7 +350,7 @@ impl VoiceParams {
             nasality: self.nasality * inv + other.nasality * t,
         }
     }
-    
+
     /// Estimate encoded size in bytes
     pub fn encoded_size(&self) -> usize {
         // pitch(4) + pitch_var(4) + energy(4) + formants(4*12) + voicing(4) + rate(4)
@@ -365,9 +378,13 @@ pub struct Formant {
 
 impl Formant {
     pub fn new(frequency: f32, bandwidth: f32, amplitude: f32) -> Self {
-        Self { frequency, bandwidth, amplitude }
+        Self {
+            frequency,
+            bandwidth,
+            amplitude,
+        }
     }
-    
+
     pub fn lerp(&self, other: &Formant, t: f32) -> Formant {
         let inv = 1.0 - t;
         Formant {
@@ -381,49 +398,49 @@ impl Formant {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_voice_state_silent() {
         let node = NodeId::new(1);
         let time = StateTime::from_millis(0);
         let state = VoiceState::silent(node, time, 1);
-        
+
         assert!(!state.is_speaking());
         assert!(state.params.is_none());
     }
-    
+
     #[test]
     fn test_voice_state_speaking() {
         let node = NodeId::new(1);
         let time = StateTime::from_millis(0);
         let params = VoiceParams::new();
         let state = VoiceState::speaking(node, time, 1, params);
-        
+
         assert!(state.is_speaking());
         assert!(state.params.is_some());
     }
-    
+
     #[test]
     fn test_voice_params_lerp() {
         let p1 = VoiceParams::new();
         let mut p2 = VoiceParams::female();
         p2.energy = 1.0;
-        
+
         let mid = p1.lerp(&p2, 0.5);
-        
+
         assert!((mid.pitch - 170.0).abs() < 1.0); // (120 + 220) / 2
         assert!((mid.energy - 0.75).abs() < 0.01); // (0.5 + 1.0) / 2
     }
-    
+
     #[test]
     fn test_voice_degradation() {
         let node = NodeId::new(1);
         let time = StateTime::from_millis(0);
         let params = VoiceParams::new();
         let mut state = VoiceState::speaking(node, time, 1, params);
-        
+
         state.degrade(DegradationLevel::L3_SymbolicPresence);
-        
+
         // At L3, params should be removed
         assert!(state.params.is_none());
         // But activity should remain

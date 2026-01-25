@@ -10,15 +10,10 @@
 
 use std::time::Duration;
 
-use elara_core::{
-    NodeId, PresenceVector, DegradationLevel, ChaosCategory,
-    ChaosSuccessCriteria, ChaosTestResult,
-};
+use elara_core::{ChaosCategory, ChaosSuccessCriteria, DegradationLevel, PresenceVector};
 
-use crate::chaos::{ChaosConfig, ChaosNetwork};
-use crate::integration::{
-    IntegrationTestConfig, IntegrationTestHarness, SimulatedNode,
-};
+use crate::chaos::ChaosConfig;
+use crate::integration::{IntegrationTestConfig, IntegrationTestHarness, SimulatedNode};
 
 // ============================================================================
 // CHAOS TEST SPECIFICATION
@@ -29,22 +24,22 @@ use crate::integration::{
 pub struct ChaosTestSpec {
     /// Test name
     pub name: String,
-    
+
     /// Chaos category
     pub category: ChaosCategory,
-    
+
     /// Test duration
     pub duration: Duration,
-    
+
     /// Chaos intensity (0.0 - 1.0)
     pub intensity: f32,
-    
+
     /// Success criteria
     pub criteria: ChaosSuccessCriteria,
-    
+
     /// Number of nodes
     pub node_count: usize,
-    
+
     /// Number of messages
     pub message_count: usize,
 }
@@ -96,7 +91,7 @@ impl ChaosTestSpec {
 pub struct ChaosHarness {
     /// Test specifications to run
     specs: Vec<ChaosTestSpec>,
-    
+
     /// Results
     results: Vec<ChaosHarnessResult>,
 }
@@ -106,22 +101,22 @@ pub struct ChaosHarness {
 pub struct ChaosHarnessResult {
     /// Test specification
     pub spec: ChaosTestSpec,
-    
+
     /// Did the test pass?
     pub passed: bool,
-    
+
     /// Final presence vectors
     pub presence_vectors: Vec<PresenceVector>,
-    
+
     /// Final degradation levels
     pub degradation_levels: Vec<DegradationLevel>,
-    
+
     /// Messages delivered
     pub messages_delivered: usize,
-    
+
     /// Messages dropped
     pub messages_dropped: usize,
-    
+
     /// Invariant violations
     pub violations: Vec<String>,
 }
@@ -143,70 +138,90 @@ impl ChaosHarness {
     /// Add all standard chaos tests
     pub fn add_standard_tests(&mut self) {
         // Ontological Chaos
-        self.add_test(ChaosTestSpec::new("ontological_light", ChaosCategory::Ontological)
-            .with_intensity(0.3)
-            .with_nodes(3)
-            .with_messages(10));
-        
-        self.add_test(ChaosTestSpec::new("ontological_heavy", ChaosCategory::Ontological)
-            .with_intensity(0.7)
-            .with_nodes(5)
-            .with_messages(30));
+        self.add_test(
+            ChaosTestSpec::new("ontological_light", ChaosCategory::Ontological)
+                .with_intensity(0.3)
+                .with_nodes(3)
+                .with_messages(10),
+        );
+
+        self.add_test(
+            ChaosTestSpec::new("ontological_heavy", ChaosCategory::Ontological)
+                .with_intensity(0.7)
+                .with_nodes(5)
+                .with_messages(30),
+        );
 
         // Temporal Chaos
-        self.add_test(ChaosTestSpec::new("temporal_light", ChaosCategory::Temporal)
-            .with_intensity(0.3)
-            .with_nodes(3)
-            .with_messages(10));
-        
-        self.add_test(ChaosTestSpec::new("temporal_heavy", ChaosCategory::Temporal)
-            .with_intensity(0.7)
-            .with_nodes(5)
-            .with_messages(30));
+        self.add_test(
+            ChaosTestSpec::new("temporal_light", ChaosCategory::Temporal)
+                .with_intensity(0.3)
+                .with_nodes(3)
+                .with_messages(10),
+        );
+
+        self.add_test(
+            ChaosTestSpec::new("temporal_heavy", ChaosCategory::Temporal)
+                .with_intensity(0.7)
+                .with_nodes(5)
+                .with_messages(30),
+        );
 
         // Topological Chaos
-        self.add_test(ChaosTestSpec::new("topological_light", ChaosCategory::Topological)
-            .with_intensity(0.3)
-            .with_nodes(4)
-            .with_messages(15));
-        
-        self.add_test(ChaosTestSpec::new("topological_heavy", ChaosCategory::Topological)
-            .with_intensity(0.7)
-            .with_nodes(6)
-            .with_messages(40));
+        self.add_test(
+            ChaosTestSpec::new("topological_light", ChaosCategory::Topological)
+                .with_intensity(0.3)
+                .with_nodes(4)
+                .with_messages(15),
+        );
+
+        self.add_test(
+            ChaosTestSpec::new("topological_heavy", ChaosCategory::Topological)
+                .with_intensity(0.7)
+                .with_nodes(6)
+                .with_messages(40),
+        );
 
         // Adversarial Chaos
-        self.add_test(ChaosTestSpec::new("adversarial_light", ChaosCategory::Adversarial)
-            .with_intensity(0.3)
-            .with_nodes(3)
-            .with_messages(10));
-        
-        self.add_test(ChaosTestSpec::new("adversarial_heavy", ChaosCategory::Adversarial)
-            .with_intensity(0.7)
-            .with_nodes(5)
-            .with_messages(30));
+        self.add_test(
+            ChaosTestSpec::new("adversarial_light", ChaosCategory::Adversarial)
+                .with_intensity(0.3)
+                .with_nodes(3)
+                .with_messages(10),
+        );
+
+        self.add_test(
+            ChaosTestSpec::new("adversarial_heavy", ChaosCategory::Adversarial)
+                .with_intensity(0.7)
+                .with_nodes(5)
+                .with_messages(30),
+        );
 
         // Perceptual Chaos
-        self.add_test(ChaosTestSpec::new("perceptual_light", ChaosCategory::Perceptual)
-            .with_intensity(0.3)
-            .with_nodes(3)
-            .with_messages(10));
-        
-        self.add_test(ChaosTestSpec::new("perceptual_heavy", ChaosCategory::Perceptual)
-            .with_intensity(0.7)
-            .with_nodes(5)
-            .with_messages(30));
+        self.add_test(
+            ChaosTestSpec::new("perceptual_light", ChaosCategory::Perceptual)
+                .with_intensity(0.3)
+                .with_nodes(3)
+                .with_messages(10),
+        );
+
+        self.add_test(
+            ChaosTestSpec::new("perceptual_heavy", ChaosCategory::Perceptual)
+                .with_intensity(0.7)
+                .with_nodes(5)
+                .with_messages(30),
+        );
     }
 
     /// Run all tests
     pub fn run_all(&mut self) -> &[ChaosHarnessResult] {
         self.results.clear();
-        
+
         for spec in self.specs.clone() {
             let result = self.run_single(&spec);
             self.results.push(result);
         }
-        
+
         &self.results
     }
 
@@ -214,25 +229,25 @@ impl ChaosHarness {
     fn run_single(&self, spec: &ChaosTestSpec) -> ChaosHarnessResult {
         // Create chaos config based on category and intensity
         let chaos_config = self.create_chaos_config(spec.category, spec.intensity);
-        
+
         // Create integration test config
         let config = IntegrationTestConfig {
             node_count: spec.node_count,
             message_count: spec.message_count,
             chaos: Some(chaos_config),
         };
-        
+
         // Run integration test
         let mut harness = IntegrationTestHarness::new(config);
         let result = harness.run();
-        
+
         // Apply category-specific chaos effects
-        let (presence_vectors, degradation_levels) = 
+        let (presence_vectors, degradation_levels) =
             self.apply_category_effects(spec, harness.nodes_mut());
-        
+
         // Check success criteria
         let passed = self.check_criteria(spec, &presence_vectors, &degradation_levels);
-        
+
         ChaosHarnessResult {
             spec: spec.clone(),
             passed,
@@ -337,7 +352,7 @@ impl ChaosHarness {
         nodes: &mut [SimulatedNode],
     ) -> (Vec<PresenceVector>, Vec<DegradationLevel>) {
         let intensity = spec.intensity;
-        
+
         for node in nodes.iter_mut() {
             match spec.category {
                 ChaosCategory::Ontological => {
@@ -384,10 +399,10 @@ impl ChaosHarness {
                 }
             }
         }
-        
-        let presence_vectors: Vec<_> = nodes.iter().map(|n| n.presence().clone()).collect();
+
+        let presence_vectors: Vec<_> = nodes.iter().map(|n| *n.presence()).collect();
         let degradation_levels: Vec<_> = nodes.iter().map(|n| n.degradation_level()).collect();
-        
+
         (presence_vectors, degradation_levels)
     }
 
@@ -402,13 +417,13 @@ impl ChaosHarness {
         if !presence_vectors.iter().all(|p| p.is_alive()) {
             return false;
         }
-        
+
         // No node should exceed max degradation for this category
         let max_allowed = spec.criteria.max_degradation;
         if degradation_levels.iter().any(|&d| d > max_allowed) {
             return false;
         }
-        
+
         true
     }
 
@@ -422,11 +437,12 @@ impl ChaosHarness {
         let total = self.results.len();
         let passed = self.results.iter().filter(|r| r.passed).count();
         let failed = total - passed;
-        
+
         let by_category: Vec<_> = ChaosCategory::all()
             .iter()
             .map(|&cat| {
-                let cat_results: Vec<_> = self.results
+                let cat_results: Vec<_> = self
+                    .results
                     .iter()
                     .filter(|r| r.spec.category == cat)
                     .collect();
@@ -434,7 +450,7 @@ impl ChaosHarness {
                 (cat, cat_passed, cat_results.len())
             })
             .collect();
-        
+
         ChaosSummary {
             total,
             passed,
@@ -490,22 +506,28 @@ pub fn run_standard_chaos_tests() -> ChaosSummary {
 /// Run chaos tests for a specific category
 pub fn run_category_tests(category: ChaosCategory) -> Vec<ChaosHarnessResult> {
     let mut harness = ChaosHarness::new();
-    
-    harness.add_test(ChaosTestSpec::new("light", category)
-        .with_intensity(0.3)
-        .with_nodes(3)
-        .with_messages(10));
-    
-    harness.add_test(ChaosTestSpec::new("moderate", category)
-        .with_intensity(0.5)
-        .with_nodes(4)
-        .with_messages(20));
-    
-    harness.add_test(ChaosTestSpec::new("heavy", category)
-        .with_intensity(0.7)
-        .with_nodes(5)
-        .with_messages(30));
-    
+
+    harness.add_test(
+        ChaosTestSpec::new("light", category)
+            .with_intensity(0.3)
+            .with_nodes(3)
+            .with_messages(10),
+    );
+
+    harness.add_test(
+        ChaosTestSpec::new("moderate", category)
+            .with_intensity(0.5)
+            .with_nodes(4)
+            .with_messages(20),
+    );
+
+    harness.add_test(
+        ChaosTestSpec::new("heavy", category)
+            .with_intensity(0.7)
+            .with_nodes(5)
+            .with_messages(30),
+    );
+
     harness.run_all().to_vec()
 }
 
@@ -533,7 +555,7 @@ mod tests {
             .with_intensity(0.8)
             .with_nodes(6)
             .with_messages(50);
-        
+
         assert_eq!(spec.name, "test");
         assert_eq!(spec.category, ChaosCategory::Temporal);
         assert_eq!(spec.intensity, 0.8);
@@ -548,9 +570,9 @@ mod tests {
             .with_intensity(0.3)
             .with_nodes(2)
             .with_messages(5);
-        
+
         let result = harness.run_single(&spec);
-        
+
         // Should pass with light chaos
         assert!(result.passed, "Light ontological chaos should pass");
         assert!(result.presence_vectors.iter().all(|p| p.is_alive()));
@@ -563,9 +585,9 @@ mod tests {
             .with_intensity(0.3)
             .with_nodes(2)
             .with_messages(5);
-        
+
         let result = harness.run_single(&spec);
-        
+
         assert!(result.passed, "Light temporal chaos should pass");
     }
 
@@ -576,9 +598,9 @@ mod tests {
             .with_intensity(0.3)
             .with_nodes(2)
             .with_messages(5);
-        
+
         let result = harness.run_single(&spec);
-        
+
         assert!(result.passed, "Light topological chaos should pass");
     }
 
@@ -589,9 +611,9 @@ mod tests {
             .with_intensity(0.3)
             .with_nodes(2)
             .with_messages(5);
-        
+
         let result = harness.run_single(&spec);
-        
+
         assert!(result.passed, "Light adversarial chaos should pass");
     }
 
@@ -602,19 +624,22 @@ mod tests {
             .with_intensity(0.3)
             .with_nodes(2)
             .with_messages(5);
-        
+
         let result = harness.run_single(&spec);
-        
+
         assert!(result.passed, "Light perceptual chaos should pass");
     }
 
     #[test]
     fn test_run_standard_chaos_tests() {
         let summary = run_standard_chaos_tests();
-        
+
         // All light tests should pass
-        assert!(summary.pass_rate() >= 0.5, "At least half of chaos tests should pass");
-        
+        assert!(
+            summary.pass_rate() >= 0.5,
+            "At least half of chaos tests should pass"
+        );
+
         // All categories should be tested
         assert_eq!(summary.by_category.len(), 5);
     }
@@ -622,18 +647,22 @@ mod tests {
     #[test]
     fn test_chaos_summary() {
         let mut harness = ChaosHarness::new();
-        harness.add_test(ChaosTestSpec::new("test1", ChaosCategory::Ontological)
-            .with_intensity(0.2)
-            .with_nodes(2)
-            .with_messages(3));
-        harness.add_test(ChaosTestSpec::new("test2", ChaosCategory::Temporal)
-            .with_intensity(0.2)
-            .with_nodes(2)
-            .with_messages(3));
-        
+        harness.add_test(
+            ChaosTestSpec::new("test1", ChaosCategory::Ontological)
+                .with_intensity(0.2)
+                .with_nodes(2)
+                .with_messages(3),
+        );
+        harness.add_test(
+            ChaosTestSpec::new("test2", ChaosCategory::Temporal)
+                .with_intensity(0.2)
+                .with_nodes(2)
+                .with_messages(3),
+        );
+
         harness.run_all();
         let summary = harness.summary();
-        
+
         assert_eq!(summary.total, 2);
         assert!(summary.pass_rate() > 0.0);
     }

@@ -2,8 +2,8 @@
 //!
 //! State propagation rules and scheduling.
 
-use elara_core::{NodeId, StateTime};
 use crate::{InterestLevel, InterestMap, PropagationTopology};
+use elara_core::{NodeId, StateTime};
 
 /// Propagation priority
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -49,17 +49,17 @@ impl StateUpdate {
             is_keyframe: false,
         }
     }
-    
+
     pub fn with_priority(mut self, priority: PropagationPriority) -> Self {
         self.priority = priority;
         self
     }
-    
+
     pub fn with_size(mut self, size: usize) -> Self {
         self.size = size;
         self
     }
-    
+
     pub fn keyframe(mut self) -> Self {
         self.is_keyframe = true;
         self
@@ -104,30 +104,30 @@ impl PropagationScheduler {
             bandwidth_usage: std::collections::HashMap::new(),
         }
     }
-    
+
     /// Set bandwidth budget
     pub fn set_bandwidth_budget(&mut self, bytes_per_second: u32) {
         self.bandwidth_budget = bytes_per_second;
     }
-    
+
     /// Decide how to propagate an update
     pub fn schedule(&self, update: &StateUpdate) -> Vec<PropagationDecision> {
         let mut decisions = Vec::new();
-        
+
         // Get all interested nodes
         let interested = self.interests.interested_nodes(update.state_id);
-        
+
         for (node, interest_level) in interested {
             // Skip the source
             if node == update.source {
                 continue;
             }
-            
+
             // Check if node is reachable in topology
             if !self.topology.has_node(node) {
                 continue;
             }
-            
+
             // Determine priority based on interest level
             let priority = match interest_level {
                 InterestLevel::Critical => PropagationPriority::Urgent,
@@ -136,15 +136,15 @@ impl PropagationScheduler {
                 InterestLevel::Low => PropagationPriority::Background,
                 InterestLevel::None => continue,
             };
-            
+
             // Determine quality level based on interest
             let quality_level = match interest_level {
                 InterestLevel::Critical | InterestLevel::High => 0, // Full quality
-                InterestLevel::Medium => 1, // Slight reduction
-                InterestLevel::Low => 2, // Significant reduction
+                InterestLevel::Medium => 1,                         // Slight reduction
+                InterestLevel::Low => 2,                            // Significant reduction
                 InterestLevel::None => continue,
             };
-            
+
             // Calculate delay based on priority
             let delay_ms = match priority {
                 PropagationPriority::Urgent => 0,
@@ -152,7 +152,7 @@ impl PropagationScheduler {
                 PropagationPriority::Normal => 50,
                 PropagationPriority::Background => 200,
             };
-            
+
             decisions.push(PropagationDecision {
                 target: node,
                 should_send: true,
@@ -161,23 +161,23 @@ impl PropagationScheduler {
                 quality_level,
             });
         }
-        
+
         // Sort by priority (highest first)
         decisions.sort_by(|a, b| b.priority.cmp(&a.priority));
-        
+
         decisions
     }
-    
+
     /// Update bandwidth usage
     pub fn record_send(&mut self, target: NodeId, bytes: u32) {
         *self.bandwidth_usage.entry(target).or_insert(0) += bytes;
     }
-    
+
     /// Reset bandwidth usage (call periodically)
     pub fn reset_bandwidth(&mut self) {
         self.bandwidth_usage.clear();
     }
-    
+
     /// Check if we have bandwidth for a send
     pub fn has_bandwidth(&self, target: NodeId, bytes: u32) -> bool {
         let used = self.bandwidth_usage.get(&target).copied().unwrap_or(0);
@@ -204,20 +204,20 @@ impl PropagationStats {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn record_send(&mut self, bytes: u64, latency_ms: u32) {
         self.updates_sent += 1;
         self.bytes_sent += bytes;
-        
+
         // Update average latency
         let n = self.updates_sent as f32;
         self.avg_latency_ms = ((n - 1.0) * self.avg_latency_ms + latency_ms as f32) / n;
-        
+
         if latency_ms > self.peak_latency_ms {
             self.peak_latency_ms = latency_ms;
         }
     }
-    
+
     pub fn record_drop(&mut self) {
         self.updates_dropped += 1;
     }
@@ -227,43 +227,41 @@ impl PropagationStats {
 mod tests {
     use super::*;
     use crate::InterestDeclaration;
-    
+
     #[test]
     fn test_propagation_scheduler() {
         let mut interests = InterestMap::new();
-        let topology = PropagationTopology::new();
-        
         let source = NodeId::new(1);
         let viewer1 = NodeId::new(2);
         let viewer2 = NodeId::new(3);
-        
+
         interests.register(InterestDeclaration::new(viewer1, 100, InterestLevel::High));
         interests.register(InterestDeclaration::new(viewer2, 100, InterestLevel::Low));
-        
+
         let mut topology = PropagationTopology::new();
         topology.add_node(source);
         topology.add_node(viewer1);
         topology.add_node(viewer2);
-        
+
         let scheduler = PropagationScheduler::new(interests, topology);
-        
+
         let update = StateUpdate::new(100, source, 1, StateTime::from_millis(0));
         let decisions = scheduler.schedule(&update);
-        
+
         assert_eq!(decisions.len(), 2);
         // High interest should be first
         assert_eq!(decisions[0].target, viewer1);
         assert_eq!(decisions[0].priority, PropagationPriority::High);
     }
-    
+
     #[test]
     fn test_propagation_stats() {
         let mut stats = PropagationStats::new();
-        
+
         stats.record_send(1000, 50);
         stats.record_send(1000, 100);
         stats.record_send(1000, 75);
-        
+
         assert_eq!(stats.updates_sent, 3);
         assert_eq!(stats.bytes_sent, 3000);
         assert_eq!(stats.peak_latency_ms, 100);

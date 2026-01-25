@@ -390,7 +390,10 @@ mod tests {
 
     #[test]
     fn test_reconstructability_priority() {
-        assert!(ReconstructabilityClass::MustFeel.priority() < ReconstructabilityClass::Ignorable.priority());
+        assert!(
+            ReconstructabilityClass::MustFeel.priority()
+                < ReconstructabilityClass::Ignorable.priority()
+        );
     }
 
     #[test]
@@ -405,9 +408,8 @@ mod tests {
 
     #[test]
     fn test_check_model_compliance() {
-        let results = check_model_compliance(|model| {
-            (true, format!("Compliant with {}", model.name()))
-        });
+        let results =
+            check_model_compliance(|model| (true, format!("Compliant with {}", model.name())));
 
         assert_eq!(results.len(), 5);
         assert!(results.iter().all(|r| r.compliant));

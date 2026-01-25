@@ -11,20 +11,20 @@
 //! - Comprehensive chaos harness (5 categories)
 
 pub mod chaos;
-pub mod simulator;
-pub mod time_simulator;
-pub mod state_fuzzer;
-pub mod integration;
 pub mod chaos_harness;
+pub mod integration;
 pub mod network_test;
+pub mod simulator;
+pub mod state_fuzzer;
+pub mod time_simulator;
 
 pub use chaos::*;
-pub use simulator::*;
-pub use time_simulator::*;
-pub use state_fuzzer::*;
-pub use integration::{
-    IntegrationTestConfig, IntegrationTestHarness, IntegrationTestResult,
-    SimulatedMessage, test_basic_convergence, test_convergence_with_chaos,
-    test_convergence_under_stress, test_degradation_ladder, test_presence_floor,
-};
 pub use chaos_harness::*;
+pub use integration::{
+    test_basic_convergence, test_convergence_under_stress, test_convergence_with_chaos,
+    test_degradation_ladder, test_presence_floor, IntegrationTestConfig, IntegrationTestHarness,
+    IntegrationTestResult, SimulatedMessage,
+};
+pub use simulator::*;
+pub use state_fuzzer::*;
+pub use time_simulator::*;

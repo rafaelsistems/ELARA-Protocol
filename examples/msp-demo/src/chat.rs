@@ -58,26 +58,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match socket_recv.recv_from(&mut buf).await {
                 Ok((len, from)) => {
                     let msg = String::from_utf8_lossy(&buf[..len]);
-                    
-                    if msg.starts_with("JOIN:") {
-                        let peer_name = &msg[5..];
+
+                    if let Some(peer_name) = msg.strip_prefix("JOIN:") {
                         println!("\n✅ {} joined from {}", peer_name, from);
-                        
+
                         // Store peer and send welcome back
                         *peer_addr_recv.lock().await = Some(from);
                         let welcome = format!("WELCOME:{}", my_name);
                         let _ = socket_recv.send_to(welcome.as_bytes(), from).await;
-                        
+
                         print!("> ");
                         let _ = io::stdout().flush();
-                    } else if msg.starts_with("WELCOME:") {
-                        let peer_name = &msg[8..];
+                    } else if let Some(peer_name) = msg.strip_prefix("WELCOME:") {
                         println!("\n✅ Connected to {}", peer_name);
                         *peer_addr_recv.lock().await = Some(from);
                         print!("> ");
                         let _ = io::stdout().flush();
-                    } else if msg.starts_with("MSG:") {
-                        let content = &msg[4..];
+                    } else if let Some(content) = msg.strip_prefix("MSG:") {
                         println!("\n💬 {}", content);
                         print!("> ");
                         let _ = io::stdout().flush();
@@ -98,16 +95,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read input in blocking thread
     let socket_send = socket.clone();
     let peer_addr_send = peer_addr.clone();
-    
+
     let stdin = io::stdin();
     for line in stdin.lock().lines() {
         let line = line?;
         let line = line.trim();
-        
+
         if line == "quit" || line == "/quit" {
             break;
         }
-        
+
         if !line.is_empty() {
             let peer = peer_addr_send.lock().await;
             if let Some(addr) = *peer {
@@ -118,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("⚠️  No peer connected yet");
             }
         }
-        
+
         print!("> ");
         io::stdout().flush()?;
     }

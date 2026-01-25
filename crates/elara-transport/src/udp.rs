@@ -94,10 +94,7 @@ pub type PacketReceiver = mpsc::Receiver<(Vec<u8>, SocketAddr)>;
 pub type PacketSender = mpsc::Sender<(Vec<u8>, SocketAddr)>;
 
 /// Start a background receive loop
-pub fn start_receive_loop(
-    socket: Arc<UdpSocket>,
-    buffer_size: usize,
-) -> PacketReceiver {
+pub fn start_receive_loop(socket: Arc<UdpSocket>, buffer_size: usize) -> PacketReceiver {
     let (tx, rx) = mpsc::channel(buffer_size);
 
     tokio::spawn(async move {

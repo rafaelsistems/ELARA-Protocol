@@ -22,10 +22,11 @@ pub const FIXED_HEADER_SIZE: usize = 30;
 pub const WIRE_VERSION: u8 = 0;
 
 /// Crypto suite identifiers
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[repr(u8)]
 pub enum CryptoSuite {
     /// X25519 + ChaCha20-Poly1305 + Ed25519
+    #[default]
     Suite0 = 0,
     /// X25519 + AES-256-GCM + Ed25519
     Suite1 = 1,
@@ -46,12 +47,6 @@ impl CryptoSuite {
     #[inline]
     pub fn to_nibble(self) -> u8 {
         self as u8
-    }
-}
-
-impl Default for CryptoSuite {
-    fn default() -> Self {
-        CryptoSuite::Suite0
     }
 }
 
@@ -266,10 +261,10 @@ mod tests {
     #[test]
     fn test_seq_window_accessors() {
         let mut header = FixedHeader::default();
-        
+
         header.set_seq(0x1234);
         header.set_window(0x5678);
-        
+
         assert_eq!(header.seq(), 0x1234);
         assert_eq!(header.window(), 0x5678);
         assert_eq!(header.seq_window, 0x12345678);

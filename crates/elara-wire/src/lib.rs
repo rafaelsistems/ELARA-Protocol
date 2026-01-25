@@ -6,12 +6,12 @@
 //! - Encrypted payload
 //! - Auth tag (AEAD)
 
-pub mod header;
 pub mod extensions;
-pub mod frame;
 pub mod flags;
+pub mod frame;
+pub mod header;
 
-pub use header::*;
 pub use extensions::*;
-pub use frame::*;
 pub use flags::*;
+pub use frame::*;
+pub use header::*;

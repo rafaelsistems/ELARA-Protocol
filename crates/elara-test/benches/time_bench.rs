@@ -3,22 +3,22 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use elara_core::{NodeId, StateTime};
-use elara_time::{TimeEngine, TimeEngineConfig, PerceptualClock, StateClock, NetworkModel};
+use elara_time::{NetworkModel, PerceptualClock, StateClock, TimeEngine, TimeEngineConfig};
 
 fn bench_time_engine_tick(c: &mut Criterion) {
     let mut engine = TimeEngine::new();
-    
+
     c.bench_function("time_engine_tick", |b| {
         b.iter(|| {
             engine.tick();
-            black_box(engine.τs())
+            black_box(engine.tau_s())
         })
     });
 }
 
 fn bench_perceptual_clock_tick(c: &mut Criterion) {
     let mut clock = PerceptualClock::new();
-    
+
     c.bench_function("perceptual_clock_tick", |b| {
         b.iter(|| {
             clock.tick();
@@ -30,7 +30,7 @@ fn bench_perceptual_clock_tick(c: &mut Criterion) {
 fn bench_state_clock_advance(c: &mut Criterion) {
     let mut clock = StateClock::new();
     let dt = std::time::Duration::from_millis(10);
-    
+
     c.bench_function("state_clock_advance", |b| {
         b.iter(|| {
             clock.advance(black_box(dt));
@@ -42,7 +42,7 @@ fn bench_state_clock_advance(c: &mut Criterion) {
 fn bench_state_clock_blend(c: &mut Criterion) {
     let mut clock = StateClock::new();
     let dt = std::time::Duration::from_millis(10);
-    
+
     c.bench_function("state_clock_blend", |b| {
         b.iter(|| {
             // Advance and blend correction
@@ -55,7 +55,7 @@ fn bench_state_clock_blend(c: &mut Criterion) {
 fn bench_network_model_update(c: &mut Criterion) {
     let mut model = NetworkModel::new();
     let peer = NodeId::new(0x1234);
-    
+
     c.bench_function("network_model_update", |b| {
         let mut i = 0u16;
         b.iter(|| {
@@ -72,12 +72,10 @@ fn bench_network_model_update(c: &mut Criterion) {
 
 fn bench_time_classify(c: &mut Criterion) {
     let engine = TimeEngine::new();
-    let base = engine.τs();
-    
+    let base = engine.tau_s();
+
     c.bench_function("time_classify", |b| {
-        b.iter(|| {
-            engine.classify_time(black_box(base))
-        })
+        b.iter(|| engine.classify_time(black_box(base)))
     });
 }
 

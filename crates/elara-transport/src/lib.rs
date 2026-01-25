@@ -6,8 +6,8 @@
 //! - Multi-path support (future)
 //! - NAT traversal (STUN)
 
-pub mod udp;
 pub mod stun;
+pub mod udp;
 
+pub use stun::{NatType, StunClient, StunResult, STUN_SERVERS};
 pub use udp::*;
-pub use stun::{StunClient, StunResult, NatType, STUN_SERVERS};

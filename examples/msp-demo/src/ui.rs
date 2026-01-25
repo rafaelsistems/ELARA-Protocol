@@ -4,10 +4,10 @@ use std::io::{self, Write};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::Mutex;
 use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::sync::Mutex;
 
-use crate::node::{DemoNode, DemoMessage};
+use crate::node::{DemoMessage, DemoNode};
 
 /// Demo UI handler
 pub struct DemoUI {
@@ -22,7 +22,7 @@ impl DemoUI {
     /// Run the main UI loop
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let node = self.node.clone();
-        
+
         // Spawn network receiver task
         let node_recv = node.clone();
         let recv_handle = tokio::spawn(async move {
@@ -30,7 +30,7 @@ impl DemoUI {
                 let n = node_recv.lock().await;
                 n.socket()
             };
-            
+
             println!("[DEBUG] Network receiver started");
             let mut buf = [0u8; 1500];
             loop {
@@ -59,7 +59,7 @@ impl DemoUI {
             let mut rx = event_rx;
             loop {
                 let msg = rx.recv().await;
-                
+
                 match msg {
                     Some(DemoMessage::Text { from, content }) => {
                         println!("\n💬 [{}]: {}", from, content);
@@ -91,16 +91,6 @@ impl DemoUI {
                         print!("> ");
                         let _ = io::stdout().flush();
                     }
-                    Some(DemoMessage::PeerLeft { name }) => {
-                        println!("\n❌ {} left the session", name);
-                        print!("> ");
-                        let _ = io::stdout().flush();
-                    }
-                    Some(DemoMessage::Degradation { level }) => {
-                        println!("\n⚠️  Degradation level: {:?}", level);
-                        print!("> ");
-                        let _ = io::stdout().flush();
-                    }
                     None => break,
                 }
             }
@@ -129,7 +119,7 @@ impl DemoUI {
             match lines.next_line().await {
                 Ok(Some(line)) => {
                     let line = line.trim();
-                    
+
                     if line.is_empty() {
                         print!("> ");
                         io::stdout().flush()?;
@@ -139,7 +129,7 @@ impl DemoUI {
                     if line.starts_with('/') {
                         let parts: Vec<&str> = line.splitn(2, ' ').collect();
                         let cmd = parts[0];
-                        let arg = parts.get(1).map(|s| *s).unwrap_or("");
+                        let arg = parts.get(1).copied().unwrap_or("");
 
                         match cmd {
                             "/quit" | "/exit" | "/q" => {
@@ -148,6 +138,7 @@ impl DemoUI {
                             "/msg" | "/m" => {
                                 if !arg.is_empty() {
                                     let mut n = node.lock().await;
+                                    n.set_typing(true).await?;
                                     n.send_message(arg).await?;
                                     println!("📤 You: {}", arg);
                                 } else {
@@ -169,8 +160,14 @@ impl DemoUI {
                                 println!("   Liveness: {:.0}%", n.presence.liveness * 100.0);
                                 println!("   Immediacy: {:.0}%", n.presence.immediacy * 100.0);
                                 println!("   Coherence: {:.0}%", n.presence.coherence * 100.0);
-                                println!("   Relational: {:.0}%", n.presence.relational_continuity * 100.0);
-                                println!("   Emotional: {:.0}%", n.presence.emotional_bandwidth * 100.0);
+                                println!(
+                                    "   Relational: {:.0}%",
+                                    n.presence.relational_continuity * 100.0
+                                );
+                                println!(
+                                    "   Emotional: {:.0}%",
+                                    n.presence.emotional_bandwidth * 100.0
+                                );
                                 println!("   Overall: {:.0}%", n.presence.score() * 100.0);
                             }
                             "/degrade" | "/d" => {
@@ -206,6 +203,7 @@ impl DemoUI {
                     } else {
                         // Treat as message
                         let mut n = node.lock().await;
+                        n.set_typing(true).await?;
                         n.send_message(line).await?;
                         println!("📤 You: {}", line);
                     }
@@ -247,24 +245,52 @@ impl DemoUI {
         println!("┌─────────────────────────────────────────────────────────┐");
         println!("│              Degradation Ladder Visualization           │");
         println!("├─────────────────────────────────────────────────────────┤");
-        
+
         let levels = [
-            ("L0: Full Perception", "████████████████████", elara_core::DegradationLevel::L0_FullPerception),
-            ("L1: Distorted", "████████████████░░░░", elara_core::DegradationLevel::L1_DistortedPerception),
-            ("L2: Fragmented", "████████████░░░░░░░░", elara_core::DegradationLevel::L2_FragmentedPerception),
-            ("L3: Symbolic", "████████░░░░░░░░░░░░", elara_core::DegradationLevel::L3_SymbolicPresence),
-            ("L4: Minimal", "████░░░░░░░░░░░░░░░░", elara_core::DegradationLevel::L4_MinimalPresence),
-            ("L5: Latent", "██░░░░░░░░░░░░░░░░░░", elara_core::DegradationLevel::L5_LatentPresence),
+            (
+                "L0: Full Perception",
+                "████████████████████",
+                elara_core::DegradationLevel::L0_FullPerception,
+            ),
+            (
+                "L1: Distorted",
+                "████████████████░░░░",
+                elara_core::DegradationLevel::L1_DistortedPerception,
+            ),
+            (
+                "L2: Fragmented",
+                "████████████░░░░░░░░",
+                elara_core::DegradationLevel::L2_FragmentedPerception,
+            ),
+            (
+                "L3: Symbolic",
+                "████████░░░░░░░░░░░░",
+                elara_core::DegradationLevel::L3_SymbolicPresence,
+            ),
+            (
+                "L4: Minimal",
+                "████░░░░░░░░░░░░░░░░",
+                elara_core::DegradationLevel::L4_MinimalPresence,
+            ),
+            (
+                "L5: Latent",
+                "██░░░░░░░░░░░░░░░░░░",
+                elara_core::DegradationLevel::L5_LatentPresence,
+            ),
         ];
 
         for (name, bar, level) in levels {
-            let marker = if level == node.degradation { "→" } else { " " };
+            let marker = if level == node.degradation {
+                "→"
+            } else {
+                " "
+            };
             println!("│ {} {:20} [{}] │", marker, name, bar);
         }
-        
+
         println!("└─────────────────────────────────────────────────────────┘");
         println!();
-        
+
         // Show what's available at current level
         match node.degradation {
             elara_core::DegradationLevel::L0_FullPerception => {

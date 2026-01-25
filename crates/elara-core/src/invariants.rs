@@ -200,7 +200,7 @@ impl std::error::Error for InvariantViolation {}
 ///
 /// assert!(compliant);
 /// ```
-pub fn validate_invariant<F>(invariant: Invariant, check: F) -> bool
+pub fn validate_invariant<F>(_invariant: Invariant, check: F) -> bool
 where
     F: FnOnce() -> bool,
 {
@@ -292,11 +292,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "ELARA Invariant Violation")]
     fn test_assert_invariant_panics() {
-        assert_invariant(
-            Invariant::RealityNeverWaits,
-            "Test violation",
-            || false,
-        );
+        assert_invariant(Invariant::RealityNeverWaits, "Test violation", || false);
     }
 
     #[test]

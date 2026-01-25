@@ -1,3 +1,4 @@
+#![allow(mixed_script_confusables)]
 //! ELARA State Engine - State reconciliation and divergence control
 //!
 //! This crate implements the State Reconciliation Engine:

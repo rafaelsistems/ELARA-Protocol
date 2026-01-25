@@ -6,7 +6,7 @@
 //! - Multi-ratchet key selection per packet class
 
 use elara_core::{ElaraError, ElaraResult, NodeId, PacketClass, RepresentationProfile, SessionId};
-use elara_wire::{Frame, FrameBuilder, FixedHeader, Extensions, FIXED_HEADER_SIZE};
+use elara_wire::{Extensions, FixedHeader, Frame, FrameBuilder, FIXED_HEADER_SIZE};
 
 use crate::{AeadCipher, MultiRatchet, ReplayManager, KEY_SIZE};
 
@@ -73,7 +73,7 @@ impl SecureFrameProcessor {
 
         // Serialize header for AAD
         let mut header_bytes = [0u8; FIXED_HEADER_SIZE];
-        header.serialize(&mut header_bytes);
+        let _ = header.serialize(&mut header_bytes);
 
         // Derive nonce from header parameters
         let nonce = crate::derive_nonce(self.local_node_id, seq, class);
@@ -204,13 +204,9 @@ impl BatchFrameProcessor {
         time_hint: i32,
         payload: &[u8],
     ) -> ElaraResult<()> {
-        let encrypted = self.processor.encrypt_frame(
-            class,
-            profile,
-            time_hint,
-            Extensions::new(),
-            payload,
-        )?;
+        let encrypted =
+            self.processor
+                .encrypt_frame(class, profile, time_hint, Extensions::new(), payload)?;
         self.outgoing.push(encrypted);
 
         // Flush if batch is full
@@ -296,7 +292,13 @@ mod tests {
         ] {
             let payload = format!("Payload for {:?}", class);
             let encrypted = sender
-                .encrypt_frame(class, RepresentationProfile::Textual, 0, Extensions::new(), payload.as_bytes())
+                .encrypt_frame(
+                    class,
+                    RepresentationProfile::Textual,
+                    0,
+                    Extensions::new(),
+                    payload.as_bytes(),
+                )
                 .unwrap();
 
             let decrypted = receiver.decrypt_frame(&encrypted).unwrap();
@@ -311,7 +313,13 @@ mod tests {
 
         let payload = b"Test payload";
         let encrypted = sender
-            .encrypt_frame(PacketClass::Core, RepresentationProfile::Textual, 0, Extensions::new(), payload)
+            .encrypt_frame(
+                PacketClass::Core,
+                RepresentationProfile::Textual,
+                0,
+                Extensions::new(),
+                payload,
+            )
             .unwrap();
 
         // First decryption should succeed
@@ -331,7 +339,13 @@ mod tests {
             SecureFrameProcessor::new(SessionId::new(2), NodeId::new(2), session_key);
 
         let encrypted = sender
-            .encrypt_frame(PacketClass::Core, RepresentationProfile::Textual, 0, Extensions::new(), b"test")
+            .encrypt_frame(
+                PacketClass::Core,
+                RepresentationProfile::Textual,
+                0,
+                Extensions::new(),
+                b"test",
+            )
             .unwrap();
 
         let result = receiver.decrypt_frame(&encrypted);
@@ -346,7 +360,12 @@ mod tests {
         // Queue multiple frames
         for i in 0..5 {
             batch
-                .queue_encrypt(PacketClass::Core, RepresentationProfile::Textual, i * 100, &[i as u8; 10])
+                .queue_encrypt(
+                    PacketClass::Core,
+                    RepresentationProfile::Textual,
+                    i * 100,
+                    &[i as u8; 10],
+                )
                 .unwrap();
         }
 

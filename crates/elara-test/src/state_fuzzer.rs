@@ -10,10 +10,9 @@
 use std::collections::HashMap;
 
 use elara_core::{
-    AuthorityScope, DeltaLaw, Event, EventType, MutationOp, NodeId, StateAtom, StateId,
-    StateTime, StateType, VersionVector,
+    Event, EventType, MutationOp, NodeId, StateAtom, StateId, StateTime, StateType, VersionVector,
 };
-use elara_state::{ReconciliationEngine, StateField};
+use elara_state::ReconciliationEngine;
 use elara_time::TimeEngine;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -122,7 +121,7 @@ impl FuzzNode {
 
     /// Process an event
     pub fn process(&mut self, event: Event) {
-        let result = self.engine.process_events(vec![event], &self.time_engine);
+        let _ = self.engine.process_events(vec![event], &self.time_engine);
         self.events_processed += 1;
     }
 
@@ -145,7 +144,7 @@ pub struct StateFuzzer {
 impl StateFuzzer {
     /// Create a new fuzzer
     pub fn new(config: FuzzerConfig) -> Self {
-        let mut rng = StdRng::seed_from_u64(config.seed);
+        let rng = StdRng::seed_from_u64(config.seed);
         let mut nodes = HashMap::new();
 
         // Create nodes
@@ -483,10 +482,34 @@ mod tests {
     #[test]
     fn test_source_ordering() {
         let events = vec![
-            Event::new(NodeId::new(1), 1, EventType::StateUpdate, StateId::new(1), MutationOp::Set(vec![1])),
-            Event::new(NodeId::new(1), 2, EventType::StateUpdate, StateId::new(1), MutationOp::Set(vec![2])),
-            Event::new(NodeId::new(2), 1, EventType::StateUpdate, StateId::new(1), MutationOp::Set(vec![3])),
-            Event::new(NodeId::new(1), 3, EventType::StateUpdate, StateId::new(1), MutationOp::Set(vec![4])),
+            Event::new(
+                NodeId::new(1),
+                1,
+                EventType::StateUpdate,
+                StateId::new(1),
+                MutationOp::Set(vec![1]),
+            ),
+            Event::new(
+                NodeId::new(1),
+                2,
+                EventType::StateUpdate,
+                StateId::new(1),
+                MutationOp::Set(vec![2]),
+            ),
+            Event::new(
+                NodeId::new(2),
+                1,
+                EventType::StateUpdate,
+                StateId::new(1),
+                MutationOp::Set(vec![3]),
+            ),
+            Event::new(
+                NodeId::new(1),
+                3,
+                EventType::StateUpdate,
+                StateId::new(1),
+                MutationOp::Set(vec![4]),
+            ),
         ];
 
         assert!(properties::source_ordering_preserved(&events));

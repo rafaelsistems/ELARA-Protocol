@@ -140,15 +140,15 @@ mod tests {
     #[test]
     fn test_flag_operations() {
         let mut flags = FrameFlags::NONE;
-        
+
         assert!(!flags.is_multipath());
         flags.set_multipath(true);
         assert!(flags.is_multipath());
-        
+
         flags.set_priority(true);
         assert!(flags.is_priority());
         assert!(flags.is_multipath());
-        
+
         flags.set_multipath(false);
         assert!(!flags.is_multipath());
         assert!(flags.is_priority());
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_flag_bits() {
         let flags = FrameFlags(FrameFlags::MULTIPATH | FrameFlags::RELAY | FrameFlags::EXTENSION);
-        
+
         assert!(flags.is_multipath());
         assert!(flags.is_relay());
         assert!(flags.has_extension());

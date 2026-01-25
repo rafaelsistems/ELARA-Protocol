@@ -54,8 +54,6 @@ pub struct Node {
     event_seq: u64,
     /// Configuration
     config: NodeConfig,
-    /// Running flag
-    running: bool,
 }
 
 impl Node {
@@ -78,7 +76,6 @@ impl Node {
             local_events: Vec::new(),
             event_seq: 0,
             config,
-            running: false,
         }
     }
 
@@ -192,10 +189,7 @@ impl Node {
 
     /// Stage 7: Generate predictions for missing state
     fn generate_predictions(&mut self) {
-        let needs_prediction = self
-            .state_engine
-            .field()
-            .atoms_needing_prediction(100); // 100ms threshold
+        let needs_prediction = self.state_engine.field().atoms_needing_prediction(100); // 100ms threshold
 
         for _state_id in needs_prediction {
             // TODO: Generate predictions based on state type

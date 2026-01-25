@@ -3,17 +3,14 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use tokio::net::UdpSocket;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 
-use elara_core::{
-    DegradationLevel, MessageId, NodeId, PresenceVector, SessionId, StateTime,
-};
+use elara_core::{DegradationLevel, MessageId, NodeId, PresenceVector, StateTime};
 use elara_crypto::Identity;
-use elara_msp::text::{TextMessage, TextStream, TypingIndicator};
-use elara_msp::voice::{VoiceFrame, VoiceState};
+use elara_msp::text::{TextMessage, TextStream};
 
 /// Peer information
 #[derive(Debug, Clone)]
@@ -31,13 +28,25 @@ pub struct Peer {
 /// Message types for internal communication
 #[derive(Debug, Clone)]
 pub enum DemoMessage {
-    Text { from: String, content: String },
-    Presence { from: String, presence: PresenceVector },
-    Typing { from: String, typing: bool },
-    Voice { from: String, energy: u8 },
-    PeerJoined { name: String },
-    PeerLeft { name: String },
-    Degradation { level: DegradationLevel },
+    Text {
+        from: String,
+        content: String,
+    },
+    Presence {
+        from: String,
+        presence: PresenceVector,
+    },
+    Typing {
+        from: String,
+        typing: bool,
+    },
+    Voice {
+        from: String,
+        energy: u8,
+    },
+    PeerJoined {
+        name: String,
+    },
 }
 
 /// Demo node state
@@ -79,7 +88,7 @@ impl DemoNode {
         let identity = Identity::generate();
         let addr = format!("0.0.0.0:{}", port);
         let socket = Arc::new(UdpSocket::bind(&addr).await?);
-        
+
         let (event_tx, event_rx) = mpsc::channel(100);
 
         let node = Self {
@@ -114,13 +123,16 @@ impl DemoNode {
     }
 
     /// Connect to a peer
-    pub async fn connect_peer(&mut self, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn connect_peer(
+        &mut self,
+        addr: SocketAddr,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // Send hello message
         let hello = format!("HELLO:{}:{:016x}", self.name, self.node_id().0);
         println!("[DEBUG] Sending HELLO to {}: {}", addr, hello);
         let bytes_sent = self.socket.send_to(hello.as_bytes(), addr).await?;
         println!("[DEBUG] Sent {} bytes to {}", bytes_sent, addr);
-        
+
         Ok(())
     }
 
@@ -128,27 +140,27 @@ impl DemoNode {
     pub async fn send_message(&mut self, content: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.msg_seq += 1;
         let msg_id = MessageId(self.msg_seq);
-        
+
         let message = TextMessage::new(
             msg_id,
             self.node_id(),
             content.as_bytes().to_vec(),
             self.state_time(),
         );
-        
+
         // Add to local stream
         self.text_stream.append(message);
-        
+
         // Broadcast to peers
         let packet = format!("MSG:{}:{}", self.name, content);
-        for (addr, _) in &self.peers {
+        for addr in self.peers.keys() {
             let _ = self.socket.send_to(packet.as_bytes(), addr).await;
         }
-        
+
         // Clear typing
         self.typing = false;
         self.broadcast_typing().await?;
-        
+
         Ok(())
     }
 
@@ -163,8 +175,12 @@ impl DemoNode {
 
     /// Broadcast typing state
     async fn broadcast_typing(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let packet = format!("TYPING:{}:{}", self.name, if self.typing { "1" } else { "0" });
-        for (addr, _) in &self.peers {
+        let packet = format!(
+            "TYPING:{}:{}",
+            self.name,
+            if self.typing { "1" } else { "0" }
+        );
+        for addr in self.peers.keys() {
             let _ = self.socket.send_to(packet.as_bytes(), addr).await;
         }
         Ok(())
@@ -174,12 +190,12 @@ impl DemoNode {
     pub async fn toggle_voice(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.voice_active = !self.voice_active;
         self.voice_energy = if self.voice_active { 200 } else { 0 };
-        
+
         let packet = format!("VOICE:{}:{}", self.name, self.voice_energy);
-        for (addr, _) in &self.peers {
+        for addr in self.peers.keys() {
             let _ = self.socket.send_to(packet.as_bytes(), addr).await;
         }
-        
+
         Ok(())
     }
 
@@ -193,7 +209,7 @@ impl DemoNode {
             DegradationLevel::L4_MinimalPresence => DegradationLevel::L5_LatentPresence,
             DegradationLevel::L5_LatentPresence => DegradationLevel::L5_LatentPresence,
         };
-        
+
         // Update presence based on degradation
         self.presence = match self.degradation {
             DegradationLevel::L0_FullPerception => PresenceVector::full(),
@@ -242,10 +258,14 @@ impl DemoNode {
     }
 
     /// Process incoming packet
-    pub async fn process_packet(&mut self, data: &[u8], from: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn process_packet(
+        &mut self,
+        data: &[u8],
+        from: SocketAddr,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let text = String::from_utf8_lossy(data);
         let parts: Vec<&str> = text.splitn(3, ':').collect();
-        
+
         if parts.is_empty() {
             return Ok(());
         }
@@ -255,13 +275,16 @@ impl DemoNode {
                 let name = parts[1].to_string();
                 let node_id_str = parts[2];
                 let node_id = u64::from_str_radix(node_id_str, 16).unwrap_or(0);
-                
-                println!("[DEBUG] Received HELLO from {} - name: {}, node_id: {}", from, name, node_id_str);
-                
+
+                println!(
+                    "[DEBUG] Received HELLO from {} - name: {}, node_id: {}",
+                    from, name, node_id_str
+                );
+
                 // Check if already known peer
                 let is_new = !self.peers.contains_key(&from);
                 println!("[DEBUG] is_new peer: {}", is_new);
-                
+
                 // Add or update peer
                 let peer = Peer {
                     node_id: NodeId::new(node_id),
@@ -275,13 +298,13 @@ impl DemoNode {
                 };
                 self.peers.insert(from, peer);
                 println!("[DEBUG] Added peer, total peers: {}", self.peers.len());
-                
+
                 // Send hello back only if this is a new peer (to avoid loop)
                 if is_new {
                     let hello = format!("HELLO:{}:{:016x}", self.name, self.node_id().0);
                     println!("[DEBUG] Sending HELLO back to {}", from);
                     self.socket.send_to(hello.as_bytes(), from).await?;
-                    
+
                     // Notify UI
                     println!("[DEBUG] Notifying UI about peer joined: {}", name);
                     let _ = self.event_tx.send(DemoMessage::PeerJoined { name }).await;
@@ -290,46 +313,55 @@ impl DemoNode {
             "MSG" if parts.len() >= 3 => {
                 let from_name = parts[1].to_string();
                 let content = parts[2].to_string();
-                
+
                 // Update last seen
                 if let Some(peer) = self.peers.get_mut(&from) {
                     peer.last_seen = Instant::now();
                     peer.typing = false;
                 }
-                
+
                 // Notify UI
-                let _ = self.event_tx.send(DemoMessage::Text { 
-                    from: from_name, 
-                    content 
-                }).await;
+                let _ = self
+                    .event_tx
+                    .send(DemoMessage::Text {
+                        from: from_name,
+                        content,
+                    })
+                    .await;
             }
             "TYPING" if parts.len() >= 3 => {
                 let from_name = parts[1].to_string();
                 let typing = parts[2] == "1";
-                
+
                 if let Some(peer) = self.peers.get_mut(&from) {
                     peer.typing = typing;
                     peer.last_seen = Instant::now();
                 }
-                
-                let _ = self.event_tx.send(DemoMessage::Typing { 
-                    from: from_name, 
-                    typing 
-                }).await;
+
+                let _ = self
+                    .event_tx
+                    .send(DemoMessage::Typing {
+                        from: from_name,
+                        typing,
+                    })
+                    .await;
             }
             "VOICE" if parts.len() >= 3 => {
                 let from_name = parts[1].to_string();
                 let energy: u8 = parts[2].parse().unwrap_or(0);
-                
+
                 if let Some(peer) = self.peers.get_mut(&from) {
                     peer.voice_active = energy > 0;
                     peer.last_seen = Instant::now();
                 }
-                
-                let _ = self.event_tx.send(DemoMessage::Voice { 
-                    from: from_name, 
-                    energy 
-                }).await;
+
+                let _ = self
+                    .event_tx
+                    .send(DemoMessage::Voice {
+                        from: from_name,
+                        energy,
+                    })
+                    .await;
             }
             "PRESENCE" if parts.len() >= 3 => {
                 let from_name = parts[1].to_string();
@@ -342,20 +374,23 @@ impl DemoNode {
                     relational_continuity: score,
                     emotional_bandwidth: score,
                 };
-                
+
                 if let Some(peer) = self.peers.get_mut(&from) {
-                    peer.presence = presence.clone();
+                    peer.presence = presence;
                     peer.last_seen = Instant::now();
                 }
-                
-                let _ = self.event_tx.send(DemoMessage::Presence { 
-                    from: from_name, 
-                    presence 
-                }).await;
+
+                let _ = self
+                    .event_tx
+                    .send(DemoMessage::Presence {
+                        from: from_name,
+                        presence,
+                    })
+                    .await;
             }
             _ => {}
         }
-        
+
         Ok(())
     }
 
@@ -368,7 +403,7 @@ impl DemoNode {
     pub async fn broadcast_presence(&self) -> Result<(), Box<dyn std::error::Error>> {
         let score = self.presence.score();
         let packet = format!("PRESENCE:{}:{:.2}", self.name, score);
-        for (addr, _) in &self.peers {
+        for addr in self.peers.keys() {
             let _ = self.socket.send_to(packet.as_bytes(), addr).await;
         }
         Ok(())
@@ -390,7 +425,11 @@ impl DemoNode {
             self.peers.len(),
             self.degradation,
             self.presence.score(),
-            if self.voice_active { "Active" } else { "Inactive" },
+            if self.voice_active {
+                "Active"
+            } else {
+                "Inactive"
+            },
             self.text_stream.messages.len(),
         )
     }
@@ -400,13 +439,14 @@ impl DemoNode {
         if self.peers.is_empty() {
             return "No peers connected".to_string();
         }
-        
+
         let mut result = String::new();
-        for (addr, peer) in &self.peers {
+        for peer in self.peers.values() {
             result.push_str(&format!(
-                "  {} ({}) - {:?} {}{}\n",
+                "  {} ({:016x}) @ {} - {:?} {}{}\n",
                 peer.name,
-                addr,
+                peer.node_id.0,
+                peer.addr,
                 peer.degradation,
                 if peer.typing { "[typing] " } else { "" },
                 if peer.voice_active { "[speaking]" } else { "" },

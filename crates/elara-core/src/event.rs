@@ -259,7 +259,10 @@ pub struct EntropyHint {
 
 impl EntropyHint {
     pub fn new(entropy: f32, confidence: f32) -> Self {
-        EntropyHint { entropy, confidence }
+        EntropyHint {
+            entropy,
+            confidence,
+        }
     }
 
     pub fn certain() -> Self {
@@ -361,7 +364,10 @@ pub struct ValidatedEvent {
 
 impl ValidatedEvent {
     pub fn new(event: Event, validated_at: StateTime) -> Self {
-        ValidatedEvent { event, validated_at }
+        ValidatedEvent {
+            event,
+            validated_at,
+        }
     }
 }
 

@@ -115,8 +115,16 @@ impl TimeEngine {
         self.perceptual.now()
     }
 
+    pub fn tau_p(&self) -> PerceptualTime {
+        self.perceptual.now()
+    }
+
     /// Get current state time (τs)
     pub fn τs(&self) -> StateTime {
+        self.state.now()
+    }
+
+    pub fn tau_s(&self) -> StateTime {
         self.state.now()
     }
 
@@ -144,7 +152,8 @@ impl TimeEngine {
     pub fn update_from_packet(&mut self, peer: NodeId, remote_time: StateTime, seq: u16) {
         let local_time = self.state.now().as_secs_f64();
         let remote_time_f = remote_time.as_secs_f64();
-        self.network.update_from_packet(peer, local_time, remote_time_f, seq);
+        self.network
+            .update_from_packet(peer, local_time, remote_time_f, seq);
     }
 
     /// Record packet reorder
@@ -218,13 +227,13 @@ mod tests {
     fn test_time_engine_tick() {
         let mut engine = TimeEngine::new();
 
-        let τp1 = engine.τp();
-        let τs1 = engine.τs();
+        let τp1 = engine.tau_p();
+        let τs1 = engine.tau_s();
 
         engine.tick();
 
-        let τp2 = engine.τp();
-        let τs2 = engine.τs();
+        let τp2 = engine.tau_p();
+        let τs2 = engine.tau_s();
 
         // Both clocks should advance
         assert!(τp2 >= τp1);

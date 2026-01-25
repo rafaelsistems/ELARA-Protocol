@@ -12,16 +12,16 @@ use crate::{FaceState, PoseState, SceneState, VisualState, VisualStateId};
 pub struct Keyframe {
     /// Keyframe identifier
     pub id: VisualStateId,
-    
+
     /// Timestamp
     pub timestamp: StateTime,
-    
+
     /// Complete visual state
     pub state: VisualState,
-    
+
     /// Keyframe interval (how often keyframes are sent)
     pub interval_ms: u32,
-    
+
     /// Sequence number
     pub sequence: u64,
 }
@@ -37,11 +37,11 @@ impl Keyframe {
             interval_ms,
         }
     }
-    
+
     /// Estimated size in bytes (for bandwidth calculation)
     pub fn estimated_size(&self) -> usize {
         let mut size = 32; // Base header
-        
+
         if self.state.face.is_some() {
             size += 128; // Face state
         }
@@ -51,7 +51,7 @@ impl Keyframe {
         if self.state.scene.is_some() {
             size += 64; // Scene state
         }
-        
+
         size
     }
 }
@@ -76,64 +76,72 @@ pub enum DeltaType {
 pub struct Delta {
     /// Delta identifier
     pub id: VisualStateId,
-    
+
     /// Reference to keyframe this delta is based on
     pub keyframe_ref: VisualStateId,
-    
+
     /// Reference to previous delta (if any)
     pub prev_delta_ref: Option<VisualStateId>,
-    
+
     /// Timestamp
     pub timestamp: StateTime,
-    
+
     /// What changed
     pub delta_type: DeltaType,
-    
+
     /// Face delta (if changed)
     pub face_delta: Option<FaceDelta>,
-    
+
     /// Pose delta (if changed)
     pub pose_delta: Option<PoseDelta>,
-    
+
     /// Scene delta (if changed)
     pub scene_delta: Option<SceneDelta>,
-    
+
     /// Sequence number
     pub sequence: u64,
 }
 
 impl Delta {
     /// Create a delta from two visual states
-    pub fn from_states(prev: &VisualState, curr: &VisualState, keyframe_ref: VisualStateId) -> Self {
+    pub fn from_states(
+        prev: &VisualState,
+        curr: &VisualState,
+        keyframe_ref: VisualStateId,
+    ) -> Self {
         let face_delta = match (&prev.face, &curr.face) {
             (Some(prev_face), Some(curr_face)) => FaceDelta::compute(prev_face, curr_face),
             (None, Some(curr_face)) => Some(FaceDelta::full(curr_face.clone())),
             (Some(_), None) => Some(FaceDelta::removed()),
             (None, None) => None,
         };
-        
+
         let pose_delta = match (&prev.pose, &curr.pose) {
             (Some(prev_pose), Some(curr_pose)) => PoseDelta::compute(prev_pose, curr_pose),
             (None, Some(curr_pose)) => Some(PoseDelta::full(curr_pose.clone())),
             (Some(_), None) => Some(PoseDelta::removed()),
             (None, None) => None,
         };
-        
+
         let scene_delta = match (&prev.scene, &curr.scene) {
             (Some(prev_scene), Some(curr_scene)) => SceneDelta::compute(prev_scene, curr_scene),
             (None, Some(curr_scene)) => Some(SceneDelta::full(curr_scene.clone())),
             (Some(_), None) => Some(SceneDelta::removed()),
             (None, None) => None,
         };
-        
-        let delta_type = match (face_delta.is_some(), pose_delta.is_some(), scene_delta.is_some()) {
+
+        let delta_type = match (
+            face_delta.is_some(),
+            pose_delta.is_some(),
+            scene_delta.is_some(),
+        ) {
             (false, false, false) => DeltaType::None,
             (true, false, false) => DeltaType::Face,
             (false, true, false) => DeltaType::Pose,
             (false, false, true) => DeltaType::Scene,
             _ => DeltaType::Multiple,
         };
-        
+
         Self {
             id: curr.id,
             keyframe_ref,
@@ -146,16 +154,16 @@ impl Delta {
             sequence: curr.sequence,
         }
     }
-    
+
     /// Is this an empty delta (no changes)?
     pub fn is_empty(&self) -> bool {
         self.delta_type == DeltaType::None
     }
-    
+
     /// Estimated size in bytes
     pub fn estimated_size(&self) -> usize {
         let mut size = 24; // Base header
-        
+
         if let Some(ref fd) = self.face_delta {
             size += fd.estimated_size();
         }
@@ -165,10 +173,10 @@ impl Delta {
         if let Some(ref sd) = self.scene_delta {
             size += sd.estimated_size();
         }
-        
+
         size
     }
-    
+
     /// Apply this delta to a visual state
     pub fn apply(&self, base: &VisualState) -> VisualState {
         let mut result = base.clone();
@@ -177,7 +185,7 @@ impl Delta {
         result.sequence = self.sequence;
         result.is_keyframe = false;
         result.keyframe_ref = Some(self.keyframe_ref);
-        
+
         if let Some(ref fd) = self.face_delta {
             result.face = fd.apply(base.face.as_ref());
         }
@@ -187,7 +195,7 @@ impl Delta {
         if let Some(ref sd) = self.scene_delta {
             result.scene = sd.apply(base.scene.as_ref());
         }
-        
+
         result
     }
 }
@@ -222,41 +230,66 @@ impl FaceDelta {
         let head_changed = (prev.head_rotation.0 - curr.head_rotation.0).abs() > 0.05
             || (prev.head_rotation.1 - curr.head_rotation.1).abs() > 0.05
             || (prev.head_rotation.2 - curr.head_rotation.2).abs() > 0.05;
-        
+
         let mouth_changed = (prev.mouth.openness - curr.mouth.openness).abs() > 0.1;
         let speaking_changed = prev.speaking != curr.speaking;
         let gaze_changed = (prev.gaze.yaw - curr.gaze.yaw).abs() > 0.1
             || (prev.gaze.pitch - curr.gaze.pitch).abs() > 0.1;
-        
+
         // Check emotion changes
         let prev_dom = prev.emotion.dominant();
         let curr_dom = curr.emotion.dominant();
         let emotion_changed = prev_dom.0 != curr_dom.0 || (prev_dom.1 - curr_dom.1).abs() > 0.2;
-        
-        if !head_changed && !mouth_changed && !speaking_changed && !gaze_changed && !emotion_changed {
+
+        if !head_changed && !mouth_changed && !speaking_changed && !gaze_changed && !emotion_changed
+        {
             return None;
         }
-        
+
         Some(FaceDelta::Partial {
-            head_rotation: if head_changed { Some(curr.head_rotation) } else { None },
-            emotion_change: if emotion_changed { Some((curr_dom.0.to_string(), curr_dom.1)) } else { None },
-            mouth_openness: if mouth_changed { Some(curr.mouth.openness) } else { None },
-            speaking: if speaking_changed { Some(curr.speaking) } else { None },
-            gaze_yaw: if gaze_changed { Some(curr.gaze.yaw) } else { None },
-            gaze_pitch: if gaze_changed { Some(curr.gaze.pitch) } else { None },
+            head_rotation: if head_changed {
+                Some(curr.head_rotation)
+            } else {
+                None
+            },
+            emotion_change: if emotion_changed {
+                Some((curr_dom.0.to_string(), curr_dom.1))
+            } else {
+                None
+            },
+            mouth_openness: if mouth_changed {
+                Some(curr.mouth.openness)
+            } else {
+                None
+            },
+            speaking: if speaking_changed {
+                Some(curr.speaking)
+            } else {
+                None
+            },
+            gaze_yaw: if gaze_changed {
+                Some(curr.gaze.yaw)
+            } else {
+                None
+            },
+            gaze_pitch: if gaze_changed {
+                Some(curr.gaze.pitch)
+            } else {
+                None
+            },
         })
     }
-    
+
     /// Full face state
     pub fn full(face: FaceState) -> FaceDelta {
         FaceDelta::Full(face)
     }
-    
+
     /// Face removed
     pub fn removed() -> FaceDelta {
         FaceDelta::Removed
     }
-    
+
     /// Estimated size
     pub fn estimated_size(&self) -> usize {
         match self {
@@ -265,15 +298,22 @@ impl FaceDelta {
             FaceDelta::Partial { .. } => 32,
         }
     }
-    
+
     /// Apply delta to base face state
     pub fn apply(&self, base: Option<&FaceState>) -> Option<FaceState> {
         match self {
             FaceDelta::Removed => None,
             FaceDelta::Full(face) => Some(face.clone()),
-            FaceDelta::Partial { head_rotation, emotion_change, mouth_openness, speaking, gaze_yaw, gaze_pitch } => {
+            FaceDelta::Partial {
+                head_rotation,
+                emotion_change,
+                mouth_openness,
+                speaking,
+                gaze_yaw,
+                gaze_pitch,
+            } => {
                 let mut face = base?.clone();
-                
+
                 if let Some(rot) = head_rotation {
                     face.head_rotation = *rot;
                 }
@@ -293,7 +333,7 @@ impl FaceDelta {
                 if let Some(pitch) = gaze_pitch {
                     face.gaze.pitch = *pitch;
                 }
-                
+
                 Some(face)
             }
         }
@@ -322,37 +362,46 @@ impl PoseDelta {
     /// Compute delta between two pose states
     pub fn compute(prev: &PoseState, curr: &PoseState) -> Option<PoseDelta> {
         let mut changed_joints = Vec::new();
-        
+
         // Find changed joints
-        for (i, (prev_joint, curr_joint)) in prev.joints.iter().zip(curr.joints.iter()).enumerate() {
+        for (i, (prev_joint, curr_joint)) in prev.joints.iter().zip(curr.joints.iter()).enumerate()
+        {
             let pos_changed = prev_joint.position.distance(&curr_joint.position) > 0.01;
             if pos_changed {
                 changed_joints.push((i, *curr_joint));
             }
         }
-        
+
         let gesture_changed = prev.gesture != curr.gesture;
         let activity_changed = prev.activity != curr.activity;
-        
+
         if changed_joints.is_empty() && !gesture_changed && !activity_changed {
             return None;
         }
-        
+
         Some(PoseDelta::Partial {
             changed_joints,
-            gesture: if gesture_changed { Some(curr.gesture) } else { None },
-            activity: if activity_changed { Some(curr.activity) } else { None },
+            gesture: if gesture_changed {
+                Some(curr.gesture)
+            } else {
+                None
+            },
+            activity: if activity_changed {
+                Some(curr.activity)
+            } else {
+                None
+            },
         })
     }
-    
+
     pub fn full(pose: PoseState) -> PoseDelta {
         PoseDelta::Full(pose)
     }
-    
+
     pub fn removed() -> PoseDelta {
         PoseDelta::Removed
     }
-    
+
     pub fn estimated_size(&self) -> usize {
         match self {
             PoseDelta::Removed => 1,
@@ -360,27 +409,31 @@ impl PoseDelta {
             PoseDelta::Partial { changed_joints, .. } => 8 + changed_joints.len() * 16,
         }
     }
-    
+
     pub fn apply(&self, base: Option<&PoseState>) -> Option<PoseState> {
         match self {
             PoseDelta::Removed => None,
             PoseDelta::Full(pose) => Some(pose.clone()),
-            PoseDelta::Partial { changed_joints, gesture, activity } => {
+            PoseDelta::Partial {
+                changed_joints,
+                gesture,
+                activity,
+            } => {
                 let mut pose = base?.clone();
-                
+
                 for (idx, joint_state) in changed_joints {
                     if *idx < pose.joints.len() {
                         pose.joints[*idx] = *joint_state;
                     }
                 }
-                
+
                 if let Some(g) = gesture {
                     pose.gesture = *g;
                 }
                 if let Some(a) = activity {
                     pose.activity = *a;
                 }
-                
+
                 Some(pose)
             }
         }
@@ -410,29 +463,41 @@ impl SceneDelta {
         let color_changed = (prev.background_color.r - curr.background_color.r).abs() > 0.1
             || (prev.background_color.g - curr.background_color.g).abs() > 0.1
             || (prev.background_color.b - curr.background_color.b).abs() > 0.1;
-        
+
         let lighting_changed = prev.lighting != curr.lighting;
         let detail_changed = (prev.detail_level - curr.detail_level).abs() > 0.1;
-        
+
         if !color_changed && !lighting_changed && !detail_changed {
             return None;
         }
-        
+
         Some(SceneDelta::Partial {
-            background_color: if color_changed { Some(curr.background_color) } else { None },
-            lighting: if lighting_changed { Some(curr.lighting) } else { None },
-            detail_level: if detail_changed { Some(curr.detail_level) } else { None },
+            background_color: if color_changed {
+                Some(curr.background_color)
+            } else {
+                None
+            },
+            lighting: if lighting_changed {
+                Some(curr.lighting)
+            } else {
+                None
+            },
+            detail_level: if detail_changed {
+                Some(curr.detail_level)
+            } else {
+                None
+            },
         })
     }
-    
+
     pub fn full(scene: SceneState) -> SceneDelta {
         SceneDelta::Full(scene)
     }
-    
+
     pub fn removed() -> SceneDelta {
         SceneDelta::Removed
     }
-    
+
     pub fn estimated_size(&self) -> usize {
         match self {
             SceneDelta::Removed => 1,
@@ -440,14 +505,18 @@ impl SceneDelta {
             SceneDelta::Partial { .. } => 16,
         }
     }
-    
+
     pub fn apply(&self, base: Option<&SceneState>) -> Option<SceneState> {
         match self {
             SceneDelta::Removed => None,
             SceneDelta::Full(scene) => Some(scene.clone()),
-            SceneDelta::Partial { background_color, lighting, detail_level } => {
+            SceneDelta::Partial {
+                background_color,
+                lighting,
+                detail_level,
+            } => {
                 let mut scene = base?.clone();
-                
+
                 if let Some(color) = background_color {
                     scene.background_color = *color;
                 }
@@ -457,7 +526,7 @@ impl SceneDelta {
                 if let Some(detail) = detail_level {
                     scene.detail_level = *detail;
                 }
-                
+
                 Some(scene)
             }
         }
@@ -468,29 +537,29 @@ impl SceneDelta {
 mod tests {
     use super::*;
     use elara_core::NodeId;
-    
+
     #[test]
     fn test_keyframe_creation() {
         let node = NodeId::new(1);
         let time = StateTime::from_millis(0);
         let state = VisualState::keyframe(node, time, 1);
         let keyframe = Keyframe::new(state, 1000);
-        
+
         assert_eq!(keyframe.interval_ms, 1000);
         assert!(keyframe.estimated_size() > 0);
     }
-    
+
     #[test]
     fn test_delta_computation() {
         let node = NodeId::new(1);
         let time1 = StateTime::from_millis(0);
         let time2 = StateTime::from_millis(100);
-        
+
         let state1 = VisualState::keyframe(node, time1, 1);
         let state2 = VisualState::keyframe(node, time2, 2);
-        
+
         let delta = Delta::from_states(&state1, &state2, state1.id);
-        
+
         // Both states have no face/pose/scene, so delta should be empty
         assert!(delta.is_empty());
     }

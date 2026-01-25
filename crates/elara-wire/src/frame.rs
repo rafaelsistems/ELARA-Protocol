@@ -59,13 +59,14 @@ impl Frame {
         }
 
         // Parse extensions if present
-        let extensions = if header.flags.has_extension() && header.header_len as usize > FIXED_HEADER_SIZE {
-            let ext_buf = &buf[FIXED_HEADER_SIZE..header.header_len as usize];
-            let (ext, _) = Extensions::parse(ext_buf, ext_buf.len())?;
-            ext
-        } else {
-            Extensions::new()
-        };
+        let extensions =
+            if header.flags.has_extension() && header.header_len as usize > FIXED_HEADER_SIZE {
+                let ext_buf = &buf[FIXED_HEADER_SIZE..header.header_len as usize];
+                let (ext, _) = Extensions::parse(ext_buf, ext_buf.len())?;
+                ext
+            } else {
+                Extensions::new()
+            };
 
         // Extract payload (still encrypted)
         let payload_start = header.header_len as usize;

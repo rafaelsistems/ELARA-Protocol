@@ -9,13 +9,12 @@
 
 mod node;
 mod ui;
-mod network;
 
 use std::io::{self, Write};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::Mutex;
 
 use node::DemoNode;
 use ui::DemoUI;

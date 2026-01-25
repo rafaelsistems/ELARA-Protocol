@@ -53,13 +53,13 @@ impl InterestDeclaration {
             ttl_ms: 0,
         }
     }
-    
+
     /// Set TTL
     pub fn with_ttl(mut self, ttl_ms: u32) -> Self {
         self.ttl_ms = ttl_ms;
         self
     }
-    
+
     /// Check if this declaration has expired
     pub fn is_expired(&self, current_time: i64) -> bool {
         if self.ttl_ms == 0 {
@@ -74,7 +74,7 @@ impl InterestDeclaration {
 pub struct InterestMap {
     /// State ID -> (Node ID -> Interest Level)
     interests: HashMap<u64, HashMap<NodeId, InterestLevel>>,
-    
+
     /// Node ID -> Set of state IDs they're interested in
     node_interests: HashMap<NodeId, HashSet<u64>>,
 }
@@ -84,7 +84,7 @@ impl InterestMap {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Register interest
     pub fn register(&mut self, decl: InterestDeclaration) {
         // Add to state -> nodes map
@@ -92,7 +92,7 @@ impl InterestMap {
             .entry(decl.state_id)
             .or_default()
             .insert(decl.node, decl.level);
-        
+
         // Add to node -> states map
         if decl.level != InterestLevel::None {
             self.node_interests
@@ -106,7 +106,7 @@ impl InterestMap {
             }
         }
     }
-    
+
     /// Unregister interest
     pub fn unregister(&mut self, node: NodeId, state_id: u64) {
         if let Some(nodes) = self.interests.get_mut(&state_id) {
@@ -116,33 +116,35 @@ impl InterestMap {
             states.remove(&state_id);
         }
     }
-    
+
     /// Get all nodes interested in a state
     pub fn interested_nodes(&self, state_id: u64) -> Vec<(NodeId, InterestLevel)> {
         self.interests
             .get(&state_id)
             .map(|nodes| {
-                nodes.iter()
+                nodes
+                    .iter()
                     .filter(|(_, level)| **level != InterestLevel::None)
                     .map(|(node, level)| (*node, *level))
                     .collect()
             })
             .unwrap_or_default()
     }
-    
+
     /// Get nodes with at least a certain interest level
     pub fn nodes_with_interest(&self, state_id: u64, min_level: InterestLevel) -> Vec<NodeId> {
         self.interests
             .get(&state_id)
             .map(|nodes| {
-                nodes.iter()
+                nodes
+                    .iter()
                     .filter(|(_, level)| **level >= min_level)
                     .map(|(node, _)| *node)
                     .collect()
             })
             .unwrap_or_default()
     }
-    
+
     /// Get all states a node is interested in
     pub fn node_states(&self, node: NodeId) -> Vec<u64> {
         self.node_interests
@@ -150,7 +152,7 @@ impl InterestMap {
             .map(|states| states.iter().copied().collect())
             .unwrap_or_default()
     }
-    
+
     /// Get interest level for a specific node and state
     pub fn get_interest(&self, node: NodeId, state_id: u64) -> InterestLevel {
         self.interests
@@ -159,22 +161,27 @@ impl InterestMap {
             .copied()
             .unwrap_or(InterestLevel::None)
     }
-    
+
     /// Count interested nodes for a state
     pub fn interest_count(&self, state_id: u64) -> usize {
         self.interests
             .get(&state_id)
-            .map(|nodes| nodes.values().filter(|l| **l != InterestLevel::None).count())
+            .map(|nodes| {
+                nodes
+                    .values()
+                    .filter(|l| **l != InterestLevel::None)
+                    .count()
+            })
             .unwrap_or(0)
     }
-    
+
     /// Remove a node entirely (they disconnected)
     pub fn remove_node(&mut self, node: NodeId) {
         // Remove from all state interest maps
         for nodes in self.interests.values_mut() {
             nodes.remove(&node);
         }
-        
+
         // Remove their interest set
         self.node_interests.remove(&node);
     }
@@ -185,13 +192,13 @@ impl InterestMap {
 pub struct LivestreamInterest {
     /// Stream ID
     pub stream_id: u64,
-    
+
     /// Interest map for this stream
     pub interests: InterestMap,
-    
+
     /// Active viewers (high interest in visual/audio)
     pub active_viewers: HashSet<NodeId>,
-    
+
     /// Lurkers (low interest, just presence)
     pub lurkers: HashSet<NodeId>,
 }
@@ -206,44 +213,50 @@ impl LivestreamInterest {
             lurkers: HashSet::new(),
         }
     }
-    
+
     /// Add an active viewer
     pub fn add_viewer(&mut self, node: NodeId) {
         self.active_viewers.insert(node);
         self.lurkers.remove(&node);
-        
+
         // Register high interest in visual and audio
         self.interests.register(InterestDeclaration::new(
-            node, self.stream_id, InterestLevel::High
+            node,
+            self.stream_id,
+            InterestLevel::High,
         ));
         self.interests.register(InterestDeclaration::new(
-            node, self.stream_id + 1, InterestLevel::High
+            node,
+            self.stream_id + 1,
+            InterestLevel::High,
         ));
     }
-    
+
     /// Add a lurker (low bandwidth mode)
     pub fn add_lurker(&mut self, node: NodeId) {
         self.lurkers.insert(node);
         self.active_viewers.remove(&node);
-        
+
         // Register low interest
         self.interests.register(InterestDeclaration::new(
-            node, self.stream_id, InterestLevel::Low
+            node,
+            self.stream_id,
+            InterestLevel::Low,
         ));
     }
-    
+
     /// Remove a viewer
     pub fn remove_viewer(&mut self, node: NodeId) {
         self.active_viewers.remove(&node);
         self.lurkers.remove(&node);
         self.interests.remove_node(node);
     }
-    
+
     /// Get total viewer count
     pub fn viewer_count(&self) -> usize {
         self.active_viewers.len() + self.lurkers.len()
     }
-    
+
     /// Get active viewer count
     pub fn active_count(&self) -> usize {
         self.active_viewers.len()
@@ -253,58 +266,78 @@ impl LivestreamInterest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_interest_registration() {
         let mut map = InterestMap::new();
-        
+
         let node1 = NodeId::new(1);
         let node2 = NodeId::new(2);
         let state_id = 100;
-        
-        map.register(InterestDeclaration::new(node1, state_id, InterestLevel::High));
-        map.register(InterestDeclaration::new(node2, state_id, InterestLevel::Medium));
-        
+
+        map.register(InterestDeclaration::new(
+            node1,
+            state_id,
+            InterestLevel::High,
+        ));
+        map.register(InterestDeclaration::new(
+            node2,
+            state_id,
+            InterestLevel::Medium,
+        ));
+
         assert_eq!(map.interest_count(state_id), 2);
         assert_eq!(map.get_interest(node1, state_id), InterestLevel::High);
         assert_eq!(map.get_interest(node2, state_id), InterestLevel::Medium);
     }
-    
+
     #[test]
     fn test_nodes_with_interest() {
         let mut map = InterestMap::new();
-        
+
         let node1 = NodeId::new(1);
         let node2 = NodeId::new(2);
         let node3 = NodeId::new(3);
         let state_id = 100;
-        
-        map.register(InterestDeclaration::new(node1, state_id, InterestLevel::High));
-        map.register(InterestDeclaration::new(node2, state_id, InterestLevel::Medium));
-        map.register(InterestDeclaration::new(node3, state_id, InterestLevel::Low));
-        
+
+        map.register(InterestDeclaration::new(
+            node1,
+            state_id,
+            InterestLevel::High,
+        ));
+        map.register(InterestDeclaration::new(
+            node2,
+            state_id,
+            InterestLevel::Medium,
+        ));
+        map.register(InterestDeclaration::new(
+            node3,
+            state_id,
+            InterestLevel::Low,
+        ));
+
         let high_nodes = map.nodes_with_interest(state_id, InterestLevel::High);
         assert_eq!(high_nodes.len(), 1);
-        
+
         let medium_nodes = map.nodes_with_interest(state_id, InterestLevel::Medium);
         assert_eq!(medium_nodes.len(), 2);
     }
-    
+
     #[test]
     fn test_livestream_interest() {
         let mut stream = LivestreamInterest::new(1000);
-        
+
         let viewer1 = NodeId::new(1);
         let viewer2 = NodeId::new(2);
         let lurker = NodeId::new(3);
-        
+
         stream.add_viewer(viewer1);
         stream.add_viewer(viewer2);
         stream.add_lurker(lurker);
-        
+
         assert_eq!(stream.viewer_count(), 3);
         assert_eq!(stream.active_count(), 2);
-        
+
         stream.remove_viewer(viewer1);
         assert_eq!(stream.viewer_count(), 2);
     }

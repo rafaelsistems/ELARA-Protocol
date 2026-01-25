@@ -38,13 +38,13 @@ pub const STUN_SERVERS: &[&str] = &[
 pub struct StunResult {
     /// Server-reflexive address (public IP:port as seen by STUN server)
     pub mapped_address: SocketAddr,
-    
+
     /// Local address used
     pub local_address: SocketAddr,
-    
+
     /// STUN server used
     pub server: SocketAddr,
-    
+
     /// Round-trip time
     pub rtt: Duration,
 }
@@ -53,7 +53,7 @@ pub struct StunResult {
 pub struct StunClient {
     /// Timeout for STUN requests
     timeout: Duration,
-    
+
     /// Number of retries
     retries: u32,
 }
@@ -230,7 +230,10 @@ impl NatType {
     pub fn stun_traversable(&self) -> bool {
         matches!(
             self,
-            NatType::NoNat | NatType::FullCone | NatType::RestrictedCone | NatType::PortRestrictedCone
+            NatType::NoNat
+                | NatType::FullCone
+                | NatType::RestrictedCone
+                | NatType::PortRestrictedCone
         )
     }
 

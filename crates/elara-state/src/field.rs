@@ -68,7 +68,9 @@ impl StateField {
 
     /// Iterate over atoms of a specific type
     pub fn iter_by_type(&self, state_type: StateType) -> impl Iterator<Item = &StateAtom> {
-        self.atoms.values().filter(move |a| a.state_type == state_type)
+        self.atoms
+            .values()
+            .filter(move |a| a.state_type == state_type)
     }
 
     /// Get atoms needing prediction (high entropy or no recent data)
@@ -107,7 +109,12 @@ impl StateField {
     }
 
     /// Create a state atom for a node
-    pub fn create_atom(&mut self, id: StateId, state_type: StateType, owner: NodeId) -> &mut StateAtom {
+    pub fn create_atom(
+        &mut self,
+        id: StateId,
+        state_type: StateType,
+        owner: NodeId,
+    ) -> &mut StateAtom {
         let atom = StateAtom::new(id, state_type, owner);
         self.atoms.insert(id, atom);
         self.atoms.get_mut(&id).unwrap()

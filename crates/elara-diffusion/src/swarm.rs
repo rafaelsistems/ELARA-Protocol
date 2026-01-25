@@ -6,9 +6,8 @@ use elara_core::{NodeId, StateTime};
 use std::collections::HashMap;
 
 use crate::{
-    AuthoritySet, InterestDeclaration, InterestLevel, InterestMap,
-    LivestreamAuthority, LivestreamInterest, PropagationScheduler,
-    PropagationTopology, StarTopology, TreeTopology, StateUpdate,
+    InterestDeclaration, InterestLevel, InterestMap, LivestreamAuthority, LivestreamInterest,
+    PropagationTopology, StarTopology, StateUpdate, TreeTopology,
 };
 
 /// Swarm configuration
@@ -93,35 +92,35 @@ impl LivestreamSwarm {
             stats: SwarmStats::new(),
         }
     }
-    
+
     /// Start the stream
     pub fn start(&mut self) {
         self.state = SwarmState::Active;
     }
-    
+
     /// Pause the stream
     pub fn pause(&mut self) {
         self.state = SwarmState::Paused;
     }
-    
+
     /// Resume the stream
     pub fn resume(&mut self) {
         self.state = SwarmState::Active;
     }
-    
+
     /// End the stream
     pub fn end(&mut self) {
         self.state = SwarmState::Ended;
     }
-    
+
     /// Add a viewer
     pub fn add_viewer(&mut self, viewer: NodeId) {
         self.interest.add_viewer(viewer);
-        
+
         match &mut self.topology {
             SwarmTopology::Star(star) => {
                 star.add_leaf(viewer);
-                
+
                 // Check if we need to switch to tree
                 if star.leaf_count() > self.config.star_to_tree_threshold {
                     self.switch_to_tree();
@@ -131,14 +130,14 @@ impl LivestreamSwarm {
                 tree.add_node(viewer);
             }
         }
-        
+
         self.stats.peak_viewers = self.stats.peak_viewers.max(self.viewer_count() as u32);
     }
-    
+
     /// Remove a viewer
     pub fn remove_viewer(&mut self, viewer: NodeId) {
         self.interest.remove_viewer(viewer);
-        
+
         match &mut self.topology {
             SwarmTopology::Star(star) => {
                 star.remove_leaf(viewer);
@@ -148,61 +147,63 @@ impl LivestreamSwarm {
             }
         }
     }
-    
+
     /// Switch from star to tree topology
     fn switch_to_tree(&mut self) {
         if let SwarmTopology::Star(star) = &self.topology {
             let mut tree = TreeTopology::new(star.center, self.config.tree_fanout);
-            
+
             // Add all existing leaves
             for &leaf in &star.leaves {
                 tree.add_node(leaf);
             }
-            
+
             self.topology = SwarmTopology::Tree(tree);
         }
     }
-    
+
     /// Get viewer count
     pub fn viewer_count(&self) -> usize {
         self.interest.viewer_count()
     }
-    
+
     /// Get broadcaster
     pub fn broadcaster(&self) -> NodeId {
         self.authority.broadcaster
     }
-    
+
     /// Check if a node can broadcast
     pub fn can_broadcast(&self, node: NodeId) -> bool {
         self.authority.can_mutate_visual(node)
     }
-    
+
     /// Create a state update for broadcasting
-    pub fn create_update(&mut self, timestamp: StateTime, size: usize, is_keyframe: bool) -> StateUpdate {
+    pub fn create_update(
+        &mut self,
+        timestamp: StateTime,
+        size: usize,
+        is_keyframe: bool,
+    ) -> StateUpdate {
         self.sequence += 1;
-        
-        let mut update = StateUpdate::new(
-            self.stream_id,
-            self.broadcaster(),
-            self.sequence,
-            timestamp,
-        ).with_size(size);
-        
+
+        let mut update =
+            StateUpdate::new(self.stream_id, self.broadcaster(), self.sequence, timestamp)
+                .with_size(size);
+
         if is_keyframe {
             update = update.keyframe();
             self.last_keyframe = timestamp;
         }
-        
+
         update
     }
-    
+
     /// Check if we need a keyframe
     pub fn needs_keyframe(&self, current_time: StateTime) -> bool {
         let elapsed = current_time.as_millis() - self.last_keyframe.as_millis();
         elapsed >= self.config.keyframe_interval_ms as i64
     }
-    
+
     /// Get propagation targets for an update
     pub fn get_targets(&self) -> Vec<NodeId> {
         match &self.topology {
@@ -274,13 +275,13 @@ impl GroupSwarm {
             max_participants,
         }
     }
-    
+
     /// Add a participant
     pub fn add_participant(&mut self, node: NodeId, joined_at: StateTime) -> bool {
         if self.participants.len() >= self.max_participants {
             return false;
         }
-        
+
         let state = ParticipantState {
             node,
             video_enabled: true,
@@ -288,77 +289,83 @@ impl GroupSwarm {
             screen_sharing: false,
             joined_at,
         };
-        
+
         // Add edges to/from all existing participants (mesh)
         for &existing in self.participants.keys() {
-            self.topology.add_edge(crate::PropagationEdge::new(existing, node));
-            self.topology.add_edge(crate::PropagationEdge::new(node, existing));
+            self.topology
+                .add_edge(crate::PropagationEdge::new(existing, node));
+            self.topology
+                .add_edge(crate::PropagationEdge::new(node, existing));
         }
-        
+
         // Register interest in all other participants' states
         for &existing in self.participants.keys() {
             self.interests.register(InterestDeclaration::new(
-                node, existing.0, InterestLevel::High
+                node,
+                existing.0,
+                InterestLevel::High,
             ));
             self.interests.register(InterestDeclaration::new(
-                existing, node.0, InterestLevel::High
+                existing,
+                node.0,
+                InterestLevel::High,
             ));
         }
-        
+
         self.participants.insert(node, state);
         self.topology.add_node(node);
-        
+
         true
     }
-    
+
     /// Remove a participant
     pub fn remove_participant(&mut self, node: NodeId) {
         self.participants.remove(&node);
         self.topology.remove_node(node);
         self.interests.remove_node(node);
     }
-    
+
     /// Get participant count
     pub fn participant_count(&self) -> usize {
         self.participants.len()
     }
-    
+
     /// Toggle video for a participant
     pub fn toggle_video(&mut self, node: NodeId, enabled: bool) {
         if let Some(p) = self.participants.get_mut(&node) {
             p.video_enabled = enabled;
         }
     }
-    
+
     /// Toggle audio for a participant
     pub fn toggle_audio(&mut self, node: NodeId, enabled: bool) {
         if let Some(p) = self.participants.get_mut(&node) {
             p.audio_enabled = enabled;
         }
     }
-    
+
     /// Start screen sharing
     pub fn start_screen_share(&mut self, node: NodeId) -> bool {
         // Only one person can screen share at a time
         if self.participants.values().any(|p| p.screen_sharing) {
             return false;
         }
-        
+
         if let Some(p) = self.participants.get_mut(&node) {
             p.screen_sharing = true;
             return true;
         }
-        
+
         false
     }
-    
+
     /// Stop screen sharing
     pub fn stop_screen_share(&mut self, node: NodeId) {
         if let Some(p) = self.participants.get_mut(&node) {
             p.screen_sharing = false;
         }
     }
-    
+
     /// Get all participants
     pub fn participants(&self) -> Vec<&ParticipantState> {
         self.participants.values().collect()
@@ -368,25 +375,25 @@ impl GroupSwarm {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_livestream_swarm() {
         let broadcaster = NodeId::new(1);
         let mut swarm = LivestreamSwarm::new(1000, broadcaster, SwarmConfig::default());
-        
+
         swarm.start();
         assert_eq!(swarm.state, SwarmState::Active);
-        
+
         // Add viewers
         for i in 2..=10 {
             swarm.add_viewer(NodeId::new(i));
         }
-        
+
         assert_eq!(swarm.viewer_count(), 9);
         assert!(swarm.can_broadcast(broadcaster));
         assert!(!swarm.can_broadcast(NodeId::new(2)));
     }
-    
+
     #[test]
     fn test_livestream_topology_switch() {
         let broadcaster = NodeId::new(1);
@@ -395,32 +402,32 @@ mod tests {
             ..Default::default()
         };
         let mut swarm = LivestreamSwarm::new(1000, broadcaster, config);
-        
+
         // Add viewers until we switch to tree
         for i in 2..=10 {
             swarm.add_viewer(NodeId::new(i));
         }
-        
+
         // Should have switched to tree
         assert!(matches!(swarm.topology, SwarmTopology::Tree(_)));
     }
-    
+
     #[test]
     fn test_group_swarm() {
         let mut group = GroupSwarm::new(2000, 10);
-        
+
         let time = StateTime::from_millis(0);
-        
+
         assert!(group.add_participant(NodeId::new(1), time));
         assert!(group.add_participant(NodeId::new(2), time));
         assert!(group.add_participant(NodeId::new(3), time));
-        
+
         assert_eq!(group.participant_count(), 3);
-        
+
         // Test screen sharing
         assert!(group.start_screen_share(NodeId::new(1)));
         assert!(!group.start_screen_share(NodeId::new(2))); // Already sharing
-        
+
         group.stop_screen_share(NodeId::new(1));
         assert!(group.start_screen_share(NodeId::new(2))); // Now allowed
     }

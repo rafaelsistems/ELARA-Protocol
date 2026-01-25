@@ -1,3 +1,4 @@
+#![allow(mixed_script_confusables)]
 //! ELARA Core - Fundamental types and primitives
 //!
 //! This crate defines the core types used throughout the ELARA protocol:
@@ -20,26 +21,25 @@
 //!
 //! See [`invariants`] module for details.
 
-pub mod id;
-pub mod time;
-pub mod state;
-pub mod event;
 pub mod class;
 pub mod error;
+pub mod event;
+pub mod id;
 pub mod invariants;
 pub mod models;
 pub mod science;
+pub mod state;
+pub mod time;
 
-pub use id::*;
-pub use time::*;
-pub use state::*;
-pub use event::*;
 pub use class::*;
 pub use error::*;
-pub use invariants::{Invariant, InvariantViolation, InvariantCompliant};
-pub use models::{ProtocolModel, ReconstructabilityClass, PerceptualWeight, ModelCompliant};
+pub use event::*;
+pub use id::*;
+pub use invariants::{Invariant, InvariantCompliant, InvariantViolation};
+pub use models::{ModelCompliant, PerceptualWeight, ProtocolModel, ReconstructabilityClass};
 pub use science::{
-    NodeClass, NodeClassSet, EventOperator, 
-    PresenceVector, DegradationLevel, 
-    ChaosCategory, ChaosSuccessCriteria, ChaosTestResult
+    ChaosCategory, ChaosSuccessCriteria, ChaosTestResult, DegradationLevel, EventOperator,
+    NodeClass, NodeClassSet, PresenceVector,
 };
+pub use state::*;
+pub use time::*;

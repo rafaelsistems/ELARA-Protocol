@@ -6,8 +6,7 @@
 //! - ω:typing:user_id - Typing indicator
 
 use elara_core::{
-    DeltaLaw, EventType, MessageId, MutationOp, NodeId, StateAtom, StateBounds, StateId,
-    StateTime, StateType, VersionVector,
+    DeltaLaw, MessageId, NodeId, StateAtom, StateBounds, StateId, StateTime, StateType,
 };
 
 /// State type prefixes for text profile
@@ -367,7 +366,7 @@ pub fn create_text_atom(stream_id: u64, owner: NodeId) -> StateAtom {
     let mut atom = StateAtom::new(text_stream_id(stream_id), StateType::Core, owner);
     atom.delta_law = DeltaLaw::AppendOnly { max_size: 1000 };
     atom.bounds = StateBounds {
-        max_size: 1024 * 1024, // 1MB
+        max_size: 1024 * 1024,                                  // 1MB
         rate_limit: Some(elara_core::RateLimit::new(10, 1000)), // 10 msg/sec
         max_entropy: 1.0,
     };

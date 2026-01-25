@@ -28,7 +28,7 @@ impl ReplayWindow {
     pub fn check(&self, seq: u16) -> bool {
         // Use wrapping subtraction to handle wraparound
         let offset = seq.wrapping_sub(self.min_seq);
-        
+
         // If offset is very large (> 32768), it means seq is "before" min_seq
         // considering wraparound (negative in signed interpretation)
         if offset > 32768 {
@@ -100,7 +100,7 @@ impl ReplayManager {
     pub fn check(&self, node: NodeId, class: PacketClass, seq: u16) -> bool {
         self.windows
             .get(&(node, class))
-            .map_or(true, |w| w.check(seq))
+            .is_none_or(|w| w.check(seq))
     }
 
     /// Accept a packet (mark as received)
