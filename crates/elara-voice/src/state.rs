@@ -15,9 +15,10 @@ impl VoiceStateId {
 }
 
 /// Voice activity state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VoiceActivity {
     /// Silent - no speech
+    #[default]
     Silent,
     /// Speaking - active speech
     Speaking,
@@ -31,15 +32,10 @@ pub enum VoiceActivity {
     Sighing,
 }
 
-impl Default for VoiceActivity {
-    fn default() -> Self {
-        Self::Silent
-    }
-}
-
 /// Speech emotion (affects prosody)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SpeechEmotion {
+    #[default]
     Neutral,
     Happy,
     Sad,
@@ -52,16 +48,11 @@ pub enum SpeechEmotion {
     Whisper,
 }
 
-impl Default for SpeechEmotion {
-    fn default() -> Self {
-        Self::Neutral
-    }
-}
-
 /// Pitch contour type
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PitchContour {
     /// Flat/monotone
+    #[default]
     Flat,
     /// Rising (question)
     Rising,
@@ -71,12 +62,6 @@ pub enum PitchContour {
     RiseFall,
     /// Fall-rise (uncertainty)
     FallRise,
-}
-
-impl Default for PitchContour {
-    fn default() -> Self {
-        Self::Flat
-    }
 }
 
 /// Complete voice state for a moment in time
