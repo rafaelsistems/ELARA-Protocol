@@ -13,6 +13,8 @@ pub struct PerceptualClock {
     last_update: Instant,
 }
 
+const MAX_PERCEPTUAL_TICK: Duration = Duration::from_millis(100);
+
 impl PerceptualClock {
     /// Create a new perceptual clock starting at zero
     pub fn new() -> Self {
@@ -29,8 +31,11 @@ impl PerceptualClock {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_update);
 
-        // Clamp to prevent large jumps (e.g., after system sleep)
-        let clamped = elapsed.min(Duration::from_millis(100));
+        let clamped = if elapsed > MAX_PERCEPTUAL_TICK {
+            MAX_PERCEPTUAL_TICK
+        } else {
+            elapsed
+        };
 
         self.value = self.value.saturating_add(clamped);
         self.last_update = now;

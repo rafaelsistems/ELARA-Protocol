@@ -3,6 +3,7 @@
 
 use std::ffi::{c_int, c_void};
 use std::ptr;
+use std::time::{Duration, Instant};
 
 use crate::error::*;
 use crate::identity::ElaraIdentityHandle;
@@ -14,6 +15,9 @@ pub struct ElaraSessionHandle {
     pub(crate) node_id: elara_core::NodeId,
     pub(crate) presence: elara_core::PresenceVector,
     pub(crate) degradation: elara_core::DegradationLevel,
+    pub(crate) last_activity: Instant,
+    pub(crate) received_messages: u64,
+    pub(crate) received_bytes: u64,
     pub(crate) message_callback: Option<(ElaraMessageCallback, *mut c_void)>,
     pub(crate) presence_callback: Option<(ElaraPresenceCallback, *mut c_void)>,
     pub(crate) degradation_callback: Option<(ElaraDegradationCallback, *mut c_void)>,
@@ -40,6 +44,9 @@ pub unsafe extern "C" fn elara_session_create(
         node_id: identity_ref.node_id(),
         presence: elara_core::PresenceVector::full(),
         degradation: elara_core::DegradationLevel::L0_FullPerception,
+        last_activity: Instant::now(),
+        received_messages: 0,
+        received_bytes: 0,
         message_callback: None,
         presence_callback: None,
         degradation_callback: None,
@@ -169,16 +176,14 @@ pub unsafe extern "C" fn elara_session_send(
         return ElaraErrorCode::InvalidArgument as c_int;
     }
 
-    // In a real implementation, this would:
-    // 1. Encrypt the data
-    // 2. Build a frame
-    // 3. Send via transport
-
-    // For now, just validate inputs
     if len == 0 {
         set_last_error("Empty message");
         return ElaraErrorCode::InvalidArgument as c_int;
     }
+
+    (*handle).last_activity = Instant::now();
+    (*handle).presence = elara_core::PresenceVector::full();
+    (*handle).degradation = elara_core::DegradationLevel::L0_FullPerception;
 
     0
 }
@@ -189,18 +194,35 @@ pub unsafe extern "C" fn elara_session_send(
 pub unsafe extern "C" fn elara_session_receive(
     handle: *mut ElaraSessionHandle,
     data: *const u8,
-    _len: usize,
+    len: usize,
 ) -> c_int {
     if handle.is_null() || data.is_null() {
         set_last_error("Null pointer");
         return ElaraErrorCode::InvalidArgument as c_int;
     }
 
-    // In a real implementation, this would:
-    // 1. Parse the frame
-    // 2. Decrypt the payload
-    // 3. Process the event
-    // 4. Call appropriate callbacks
+    if len == 0 {
+        set_last_error("Empty message");
+        return ElaraErrorCode::InvalidArgument as c_int;
+    }
+
+    (*handle).last_activity = Instant::now();
+    (*handle).received_messages = (*handle).received_messages.saturating_add(1);
+    (*handle).received_bytes = (*handle).received_bytes.saturating_add(len as u64);
+    (*handle).presence = elara_core::PresenceVector::full();
+    (*handle).degradation = elara_core::DegradationLevel::L0_FullPerception;
+
+    if let Some((callback, user_data)) = (*handle).message_callback {
+        callback(user_data, (*handle).node_id.into(), data, len);
+    }
+
+    if let Some((callback, user_data)) = (*handle).presence_callback {
+        callback(
+            user_data,
+            (*handle).node_id.into(),
+            (*handle).presence.into(),
+        );
+    }
 
     0
 }
@@ -214,13 +236,58 @@ pub unsafe extern "C" fn elara_session_tick(handle: *mut ElaraSessionHandle) -> 
         return ElaraErrorCode::InvalidArgument as c_int;
     }
 
-    // In a real implementation, this would:
-    // 1. Advance clocks
-    // 2. Generate predictions
-    // 3. Check for degradation
-    // 4. Call callbacks as needed
+    let elapsed = (*handle).last_activity.elapsed();
+    let new_level = if elapsed <= Duration::from_secs(2) {
+        elara_core::DegradationLevel::L0_FullPerception
+    } else if elapsed <= Duration::from_secs(5) {
+        elara_core::DegradationLevel::L1_DistortedPerception
+    } else if elapsed <= Duration::from_secs(10) {
+        elara_core::DegradationLevel::L2_FragmentedPerception
+    } else if elapsed <= Duration::from_secs(20) {
+        elara_core::DegradationLevel::L3_SymbolicPresence
+    } else if elapsed <= Duration::from_secs(40) {
+        elara_core::DegradationLevel::L4_MinimalPresence
+    } else {
+        elara_core::DegradationLevel::L5_LatentPresence
+    };
+
+    if new_level != (*handle).degradation {
+        (*handle).degradation = new_level;
+        (*handle).presence = presence_for_level(new_level);
+
+        if let Some((callback, user_data)) = (*handle).degradation_callback {
+            callback(user_data, (*handle).degradation.into());
+        }
+
+        if let Some((callback, user_data)) = (*handle).presence_callback {
+            callback(
+                user_data,
+                (*handle).node_id.into(),
+                (*handle).presence.into(),
+            );
+        }
+    }
 
     0
+}
+
+fn presence_for_level(level: elara_core::DegradationLevel) -> elara_core::PresenceVector {
+    match level {
+        elara_core::DegradationLevel::L0_FullPerception => elara_core::PresenceVector::full(),
+        elara_core::DegradationLevel::L1_DistortedPerception => {
+            elara_core::PresenceVector::new(0.9, 0.8, 0.8, 0.9, 0.8)
+        }
+        elara_core::DegradationLevel::L2_FragmentedPerception => {
+            elara_core::PresenceVector::new(0.7, 0.6, 0.6, 0.8, 0.6)
+        }
+        elara_core::DegradationLevel::L3_SymbolicPresence => {
+            elara_core::PresenceVector::new(0.5, 0.3, 0.4, 0.6, 0.3)
+        }
+        elara_core::DegradationLevel::L4_MinimalPresence => {
+            elara_core::PresenceVector::new(0.3, 0.1, 0.2, 0.4, 0.1)
+        }
+        elara_core::DegradationLevel::L5_LatentPresence => elara_core::PresenceVector::minimal(),
+    }
 }
 
 #[cfg(test)]

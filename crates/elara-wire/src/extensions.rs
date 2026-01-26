@@ -1,7 +1,7 @@
 //! Variable header extensions (TLV format)
 //!
 //! Extensions allow protocol evolution without breaking compatibility.
-//! Format: [TYPE:1][LEN:1][VALUE:LEN]
+//! Format: \[TYPE:1\]\[LEN:1\]\[VALUE:LEN\]
 
 use elara_core::{ElaraError, ElaraResult};
 

@@ -16,7 +16,7 @@ pub struct VersionVector {
 impl VersionVector {
     pub fn new() -> Self {
         VersionVector {
-            clocks: HashMap::new(),
+            clocks: HashMap::with_capacity(8),
         }
     }
 
@@ -27,35 +27,39 @@ impl VersionVector {
     }
 
     /// Increment the clock for a node
+    #[inline]
     pub fn increment(&mut self, node: NodeId) {
         *self.clocks.entry(node).or_insert(0) += 1;
     }
 
     /// Set the clock for a node
+    #[inline]
     pub fn set(&mut self, node: NodeId, value: u64) {
         self.clocks.insert(node, value);
     }
 
-    /// Check if self happens-before other
+    #[inline]
     pub fn happens_before(&self, other: &VersionVector) -> bool {
-        if self == other {
-            return false;
-        }
-
-        // self ≤ other for all nodes, and strictly < for at least one
         let mut strictly_less = false;
 
         for (node, &clock) in &self.clocks {
-            let other_clock = other.get(*node);
-            if clock > other_clock {
-                return false;
-            }
-            if clock < other_clock {
-                strictly_less = true;
+            match other.clocks.get(node) {
+                Some(&other_clock) => {
+                    if clock > other_clock {
+                        return false;
+                    }
+                    if clock < other_clock {
+                        strictly_less = true;
+                    }
+                }
+                None => {
+                    if clock > 0 {
+                        return false;
+                    }
+                }
             }
         }
 
-        // Check nodes in other but not in self
         for (node, &clock) in &other.clocks {
             if !self.clocks.contains_key(node) && clock > 0 {
                 strictly_less = true;
@@ -66,34 +70,62 @@ impl VersionVector {
     }
 
     /// Check if two version vectors are concurrent (neither happens-before)
+    #[inline]
     pub fn concurrent(&self, other: &VersionVector) -> bool {
-        !self.happens_before(other) && !other.happens_before(self) && self != other
+        let mut less = false;
+        let mut greater = false;
+
+        for (node, &a) in &self.clocks {
+            let b = other.clocks.get(node).copied().unwrap_or(0);
+            if a < b {
+                less = true;
+            } else if a > b {
+                greater = true;
+            }
+            if less && greater {
+                return true;
+            }
+        }
+
+        for (node, &b) in &other.clocks {
+            if self.clocks.contains_key(node) {
+                continue;
+            }
+            if b > 0 && greater {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Merge two version vectors (element-wise max)
+    #[inline]
     pub fn merge(&self, other: &VersionVector) -> VersionVector {
         let mut merged = self.clocks.clone();
-
         for (node, &clock) in &other.clocks {
             merged
                 .entry(*node)
                 .and_modify(|c| *c = (*c).max(clock))
                 .or_insert(clock);
         }
-
         VersionVector { clocks: merged }
     }
 
     /// Compact representation for wire format
     pub fn to_compact(&self) -> Vec<(NodeId, u64)> {
-        self.clocks.iter().map(|(&n, &c)| (n, c)).collect()
+        let mut out = Vec::with_capacity(self.clocks.len());
+        for (&n, &c) in &self.clocks {
+            out.push((n, c));
+        }
+        out
     }
 
     /// Restore from compact representation
     pub fn from_compact(entries: Vec<(NodeId, u64)>) -> Self {
-        VersionVector {
-            clocks: entries.into_iter().collect(),
-        }
+        let mut clocks = HashMap::with_capacity(entries.len());
+        clocks.extend(entries);
+        VersionVector { clocks }
     }
 }
 

@@ -260,6 +260,10 @@ impl TimeIntent {
         }
     }
 
+    pub fn ts_offset(&self) -> i32 {
+        self.τs_offset
+    }
+
     pub fn with_deadline(mut self, deadline: i32) -> Self {
         self.deadline = Some(deadline);
         self

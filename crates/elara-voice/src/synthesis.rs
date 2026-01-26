@@ -240,9 +240,60 @@ impl VoiceActivityDetector {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct VoicePipelineEvaluation {
+    pub params_samples: usize,
+    pub frame_samples: usize,
+    pub params_peak: f32,
+    pub frame_peak: f32,
+    pub params_rms: f32,
+    pub frame_rms: f32,
+}
+
+impl VoicePipelineEvaluation {
+    pub fn evaluate(params: &VoiceParams, frame: &VoiceFrame, config: SynthesisConfig) -> Self {
+        let mut synth = VoiceSynthesizer::new(config);
+        let params_samples = synth.synthesize_params(params);
+        let frame_samples = synth.synthesize_frame(frame);
+
+        let (params_peak, params_rms) = sample_stats(&params_samples);
+        let (frame_peak, frame_rms) = sample_stats(&frame_samples);
+
+        Self {
+            params_samples: params_samples.len(),
+            frame_samples: frame_samples.len(),
+            params_peak,
+            frame_peak,
+            params_rms,
+            frame_rms,
+        }
+    }
+}
+
+fn sample_stats(samples: &[f32]) -> (f32, f32) {
+    if samples.is_empty() {
+        return (0.0, 0.0);
+    }
+
+    let mut peak = 0.0;
+    let mut sum_sq = 0.0;
+
+    for &sample in samples {
+        let abs = sample.abs();
+        if abs > peak {
+            peak = abs;
+        }
+        sum_sq += sample * sample;
+    }
+
+    let rms = (sum_sq / samples.len() as f32).sqrt();
+    (peak, rms)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use elara_core::{NodeId, StateTime};
 
     #[test]
     fn test_synthesizer() {
@@ -261,14 +312,25 @@ mod tests {
     }
 
     #[test]
+    fn test_voice_pipeline_evaluation() {
+        let config = SynthesisConfig::default();
+        let params = VoiceParams::new();
+        let frame = VoiceFrame::voiced(NodeId::new(1), StateTime::from_millis(0), 1, 120.0, 0.5);
+
+        let eval = VoicePipelineEvaluation::evaluate(&params, &frame, config);
+
+        assert_eq!(eval.params_samples, 320);
+        assert_eq!(eval.frame_samples, 320);
+        assert!(eval.params_peak >= 0.0);
+        assert!(eval.frame_peak >= 0.0);
+    }
+    #[test]
     fn test_vad() {
         let mut vad = VoiceActivityDetector::new(0.01, 5);
 
-        // Silent frame
         let silent = vec![0.0; 320];
         assert_eq!(vad.process(&silent), VoiceActivity::Silent);
 
-        // Active frame
         let active: Vec<f32> = (0..320).map(|i| (i as f32 * 0.1).sin() * 0.5).collect();
         assert_eq!(vad.process(&active), VoiceActivity::Speaking);
     }

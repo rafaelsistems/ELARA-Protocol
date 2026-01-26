@@ -82,7 +82,7 @@ impl StateId {
     }
 
     /// Create a state ID from type prefix and instance ID
-    /// Format: [type:16][instance:48]
+    /// Format: \[type:16\]\[instance:48\]
     #[inline]
     pub fn from_type_instance(state_type: u16, instance: u64) -> Self {
         let id = ((state_type as u64) << 48) | (instance & 0x0000_FFFF_FFFF_FFFF);

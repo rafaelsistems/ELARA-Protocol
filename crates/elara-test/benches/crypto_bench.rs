@@ -48,7 +48,7 @@ fn bench_secure_frame_encrypt_sizes(c: &mut Criterion) {
     let node_id = NodeId::new(0xDEAD_BEEF_CAFE_BABE);
     let session_key = [0x42u8; 32];
 
-    let sizes = [64, 256, 1024, 4096];
+    let sizes = [64, 256, 1024];
 
     let mut group = c.benchmark_group("encrypt_by_size");
 
@@ -81,7 +81,6 @@ fn bench_secure_frame_decrypt(c: &mut Criterion) {
     let session_key = [0x42u8; 32];
 
     let mut encrypt_processor = SecureFrameProcessor::new(session_id, node_id, session_key);
-    let mut decrypt_processor = SecureFrameProcessor::new(session_id, node_id, session_key);
 
     let payload = vec![0u8; 256];
     let encrypted = encrypt_processor
@@ -99,6 +98,7 @@ fn bench_secure_frame_decrypt(c: &mut Criterion) {
 
     group.bench_function("256_bytes", |b| {
         b.iter(|| {
+            let mut decrypt_processor = SecureFrameProcessor::new(session_id, node_id, session_key);
             decrypt_processor
                 .decrypt_frame(black_box(&encrypted))
                 .unwrap()

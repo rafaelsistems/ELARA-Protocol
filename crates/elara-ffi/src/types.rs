@@ -47,7 +47,7 @@ pub struct ElaraBytes {
 }
 
 impl ElaraBytes {
-    /// Create from a Vec<u8>, transferring ownership
+    /// Create from a `Vec<u8>`, transferring ownership
     pub fn from_vec(mut v: Vec<u8>) -> Self {
         let result = Self {
             data: v.as_mut_ptr(),

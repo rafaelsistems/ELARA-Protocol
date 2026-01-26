@@ -2,8 +2,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use elara_core::{NodeId, StateTime};
-use elara_time::{NetworkModel, PerceptualClock, StateClock, TimeEngine, TimeEngineConfig};
+use elara_core::NodeId;
+use elara_time::{NetworkModel, PerceptualClock, StateClock, TimeEngine};
 
 fn bench_time_engine_tick(c: &mut Criterion) {
     let mut engine = TimeEngine::new();

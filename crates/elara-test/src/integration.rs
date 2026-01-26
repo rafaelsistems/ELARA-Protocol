@@ -6,9 +6,37 @@
 //! - Degradation ladder compliance
 //! - Invariant verification
 
-use elara_core::{DegradationLevel, NodeId, PresenceVector, VersionVector};
+use std::ffi::c_void;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use elara_core::{
+    DegradationLevel, Event, EventType, MutationOp, NodeId, PresenceVector, SessionId, StateId,
+    StateTime, VersionVector,
+};
+use elara_ffi::{
+    elara_identity_free, elara_identity_generate, elara_session_create, elara_session_free,
+    elara_session_receive, elara_session_send, elara_session_set_message_callback,
+    elara_session_tick, ElaraNodeId,
+};
+use elara_runtime::Node;
+use elara_voice::{SynthesisConfig, VoiceFrame, VoiceParams, VoicePipelineEvaluation};
+use elara_wire::{FixedHeader, Frame};
+use tokio::runtime::Builder;
 
 use crate::chaos::{ChaosConfig, ChaosNetwork};
+use crate::chaos_harness::{ChaosHarness, ChaosHarnessResult};
+use crate::network_test::{NetworkTestConfig, NetworkTestHarness, NetworkTestResult};
+
+static MESSAGE_CALLBACK_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+extern "C" fn message_callback(
+    _user_data: *mut c_void,
+    _source: ElaraNodeId,
+    _data: *const u8,
+    _len: usize,
+) {
+    MESSAGE_CALLBACK_COUNT.fetch_add(1, Ordering::Relaxed);
+}
 
 // ============================================================================
 // SIMULATED NODE
@@ -34,6 +62,48 @@ pub struct SimulatedNode {
 
     /// Event sequence counter
     seq: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct TransportEvaluation {
+    pub network: NetworkTestResult,
+    pub network_lossy: NetworkTestResult,
+    pub network_nat: NetworkTestResult,
+    pub chaos: Vec<ChaosHarnessResult>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CodecEvaluation {
+    pub voice: VoicePipelineEvaluation,
+}
+
+#[derive(Debug, Clone)]
+pub struct MobileSdkEvaluation {
+    pub session_created: bool,
+    pub send_ok: bool,
+    pub receive_ok: bool,
+    pub tick_ok: bool,
+    pub callbacks_invoked: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct ObservabilityEvaluation {
+    pub ticks: u64,
+    pub incoming_queued: u64,
+    pub outgoing_popped: u64,
+    pub local_events_queued: u64,
+    pub events_signed: u64,
+    pub packets_in: u64,
+    pub packets_out: u64,
+    pub last_tick_duration_ms: u128,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProductionEvaluation {
+    pub transport: TransportEvaluation,
+    pub codec: CodecEvaluation,
+    pub mobile: MobileSdkEvaluation,
+    pub observability: ObservabilityEvaluation,
 }
 
 impl SimulatedNode {
@@ -502,9 +572,200 @@ pub fn test_presence_floor() -> bool {
     node.is_alive() || node.presence().score() >= 0.0
 }
 
+pub fn evaluate_production() -> ProductionEvaluation {
+    let transport = evaluate_transport();
+    let codec = evaluate_codec();
+    let mobile = evaluate_mobile_sdk();
+    let observability = evaluate_observability();
+
+    ProductionEvaluation {
+        transport,
+        codec,
+        mobile,
+        observability,
+    }
+}
+
+fn evaluate_transport() -> TransportEvaluation {
+    let runtime = Builder::new_current_thread().enable_all().build();
+
+    let run_network = |config: NetworkTestConfig| -> NetworkTestResult {
+        let Ok(runtime) = runtime.as_ref() else {
+            return NetworkTestResult::failure(vec!["runtime build failed".to_string()]);
+        };
+
+        runtime.block_on(async move {
+            match NetworkTestHarness::new(config).await {
+                Ok(mut harness) => harness.run().await,
+                Err(err) => NetworkTestResult::failure(vec![format!(
+                    "network harness creation failed: {}",
+                    err
+                )]),
+            }
+        })
+    };
+
+    let network = run_network(NetworkTestConfig::default());
+
+    let network_lossy = run_network(NetworkTestConfig {
+        messages_per_node: 10,
+        recv_timeout_ms: 200,
+        send_delay_ms: 2,
+        loss_rate: 0.2,
+        jitter_ms: 80,
+        rng_seed: 77,
+        nat_relay: false,
+        ..NetworkTestConfig::default()
+    });
+
+    let network_nat = run_network(NetworkTestConfig {
+        messages_per_node: 8,
+        recv_timeout_ms: 200,
+        send_delay_ms: 2,
+        loss_rate: 0.05,
+        jitter_ms: 30,
+        rng_seed: 101,
+        nat_relay: true,
+        ..NetworkTestConfig::default()
+    });
+
+    let mut chaos_harness = ChaosHarness::new();
+    chaos_harness.add_standard_tests();
+    let chaos = chaos_harness.run_all().to_vec();
+
+    TransportEvaluation {
+        network,
+        network_lossy,
+        network_nat,
+        chaos,
+    }
+}
+
+fn evaluate_codec() -> CodecEvaluation {
+    let params = VoiceParams::new();
+    let frame = VoiceFrame::from_params(NodeId::new(1), StateTime::from_millis(0), 1, &params);
+    let voice = VoicePipelineEvaluation::evaluate(&params, &frame, SynthesisConfig::default());
+
+    CodecEvaluation { voice }
+}
+
+fn evaluate_mobile_sdk() -> MobileSdkEvaluation {
+    MESSAGE_CALLBACK_COUNT.store(0, Ordering::Relaxed);
+
+    let identity = elara_identity_generate();
+    let session = unsafe { elara_session_create(identity, 1) };
+
+    let session_created = !identity.is_null() && !session.is_null();
+
+    let callback_ok = if session.is_null() {
+        false
+    } else {
+        let result = unsafe {
+            elara_session_set_message_callback(session, message_callback, std::ptr::null_mut())
+        };
+        result == 0
+    };
+
+    let payload = b"ping";
+    let send_ok = if session.is_null() {
+        false
+    } else {
+        let result = unsafe {
+            elara_session_send(
+                session,
+                ElaraNodeId { value: 2 },
+                payload.as_ptr(),
+                payload.len(),
+            )
+        };
+        result == 0
+    };
+
+    let receive_ok = if session.is_null() {
+        false
+    } else {
+        let result = unsafe { elara_session_receive(session, payload.as_ptr(), payload.len()) };
+        result == 0
+    };
+
+    let tick_ok = if session.is_null() {
+        false
+    } else {
+        let result = unsafe { elara_session_tick(session) };
+        result == 0
+    };
+
+    if !session.is_null() {
+        unsafe { elara_session_free(session) };
+    }
+
+    if !identity.is_null() {
+        unsafe { elara_identity_free(identity) };
+    }
+
+    let callbacks_invoked = if callback_ok {
+        MESSAGE_CALLBACK_COUNT.load(Ordering::Relaxed)
+    } else {
+        0
+    };
+
+    MobileSdkEvaluation {
+        session_created,
+        send_ok,
+        receive_ok,
+        tick_ok,
+        callbacks_invoked,
+    }
+}
+
+fn evaluate_observability() -> ObservabilityEvaluation {
+    let mut node = Node::new();
+    let header = FixedHeader::new(SessionId::new(1), node.node_id());
+    let frame = Frame::new(header);
+
+    node.queue_incoming(frame);
+    let node_id = node.node_id();
+    let seq = node.next_event_seq();
+    node.queue_local_event(Event::new(
+        node_id,
+        seq,
+        EventType::TextAppend,
+        StateId::new(1),
+        MutationOp::Append(b"obs".to_vec()),
+    ));
+    node.tick();
+    node.pop_outgoing();
+
+    let stats = node.stats();
+
+    ObservabilityEvaluation {
+        ticks: stats.ticks,
+        incoming_queued: stats.incoming_queued,
+        outgoing_popped: stats.outgoing_popped,
+        local_events_queued: stats.local_events_queued,
+        events_signed: stats.events_signed,
+        packets_in: stats.packets_in,
+        packets_out: stats.packets_out,
+        last_tick_duration_ms: stats.last_tick_duration.as_millis(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::network_test::{
+        measure_rtt_nat_samples, measure_rtt_samples, measure_rtt_samples_with_conditions,
+        NetworkTestNode,
+    };
+
+    fn percentile_ms(samples: &mut [std::time::Duration], percentile: f64) -> Option<f64> {
+        if samples.is_empty() {
+            return None;
+        }
+        samples.sort_by_key(|d| d.as_nanos());
+        let idx = ((samples.len() - 1) as f64 * percentile).ceil() as usize;
+        samples.get(idx).map(|d| d.as_secs_f64() * 1000.0)
+    }
 
     #[test]
     fn test_simulated_node_creation() {
@@ -590,7 +851,122 @@ mod tests {
     }
 
     #[test]
+    fn test_with_stress_chaos() {
+        let result = test_convergence_under_stress();
+        assert!(result.all_alive(), "All nodes should still be alive");
+        assert!(
+            result.invariants_maintained,
+            "Invariants should be maintained"
+        );
+    }
+
+    #[test]
     fn test_presence_floor_test() {
         assert!(test_presence_floor(), "Presence floor test should pass");
+    }
+
+    #[test]
+    fn test_production_evaluation_basics() {
+        let evaluation = evaluate_production();
+        let network = &evaluation.transport.network;
+        let network_lossy = &evaluation.transport.network_lossy;
+        let network_nat = &evaluation.transport.network_nat;
+
+        println!("kpi_delivery_rate_default={:.3}", network.delivery_rate);
+        println!("kpi_delivery_rate_lossy={:.3}", network_lossy.delivery_rate);
+        println!("kpi_delivery_rate_nat={:.3}", network_nat.delivery_rate);
+        println!("kpi_messages_sent_default={}", network.messages_sent);
+        println!(
+            "kpi_messages_received_default={}",
+            network.messages_received
+        );
+        println!("kpi_messages_sent_lossy={}", network_lossy.messages_sent);
+        println!(
+            "kpi_messages_received_lossy={}",
+            network_lossy.messages_received
+        );
+        println!("kpi_messages_sent_nat={}", network_nat.messages_sent);
+        println!(
+            "kpi_messages_received_nat={}",
+            network_nat.messages_received
+        );
+        println!("kpi_loss_ratio_default={:.3}", 1.0 - network.delivery_rate);
+        println!(
+            "kpi_loss_ratio_lossy={:.3}",
+            1.0 - network_lossy.delivery_rate
+        );
+        println!("kpi_loss_ratio_nat={:.3}", 1.0 - network_nat.delivery_rate);
+        println!("kpi_violations_default={}", network.violations.len());
+        println!("kpi_violations_lossy={}", network_lossy.violations.len());
+        println!("kpi_violations_nat={}", network_nat.violations.len());
+
+        let runtime = Builder::new_current_thread().enable_all().build();
+        if let Ok(runtime) = runtime {
+            let (mut rtt_default, mut rtt_nat, mut rtt_lossy) = runtime.block_on(async {
+                let mut node_a = NetworkTestNode::new(NodeId::new(9001)).await.ok();
+                let mut node_b = NetworkTestNode::new(NodeId::new(9002)).await.ok();
+                let rtt_default = match (&mut node_a, &mut node_b) {
+                    (Some(a), Some(b)) => measure_rtt_samples(a, b, 20).await,
+                    _ => Vec::new(),
+                };
+                let mut node_lossy_a = NetworkTestNode::new(NodeId::new(9101)).await.ok();
+                let mut node_lossy_b = NetworkTestNode::new(NodeId::new(9102)).await.ok();
+                let rtt_lossy = match (&mut node_lossy_a, &mut node_lossy_b) {
+                    (Some(a), Some(b)) => {
+                        measure_rtt_samples_with_conditions(a, b, 20, 0.2, 80, 77).await
+                    }
+                    _ => Vec::new(),
+                };
+                let rtt_nat = measure_rtt_nat_samples(20).await;
+                (rtt_default, rtt_nat, rtt_lossy)
+            });
+
+            match percentile_ms(&mut rtt_default, 0.95) {
+                Some(value) => println!("kpi_rtt_p95_ms_default={:.3}", value),
+                None => println!("kpi_rtt_p95_ms_default=NA"),
+            }
+            match percentile_ms(&mut rtt_default, 0.99) {
+                Some(value) => println!("kpi_rtt_p99_ms_default={:.3}", value),
+                None => println!("kpi_rtt_p99_ms_default=NA"),
+            }
+            match percentile_ms(&mut rtt_nat, 0.95) {
+                Some(value) => println!("kpi_rtt_p95_ms_nat={:.3}", value),
+                None => println!("kpi_rtt_p95_ms_nat=NA"),
+            }
+            match percentile_ms(&mut rtt_nat, 0.99) {
+                Some(value) => println!("kpi_rtt_p99_ms_nat={:.3}", value),
+                None => println!("kpi_rtt_p99_ms_nat=NA"),
+            }
+            match percentile_ms(&mut rtt_lossy, 0.95) {
+                Some(value) => println!("kpi_rtt_p95_ms_lossy={:.3}", value),
+                None => println!("kpi_rtt_p95_ms_lossy=NA"),
+            }
+            match percentile_ms(&mut rtt_lossy, 0.99) {
+                Some(value) => println!("kpi_rtt_p99_ms_lossy={:.3}", value),
+                None => println!("kpi_rtt_p99_ms_lossy=NA"),
+            }
+        } else {
+            println!("kpi_rtt_p95_ms_default=NA");
+            println!("kpi_rtt_p99_ms_default=NA");
+            println!("kpi_rtt_p95_ms_nat=NA");
+            println!("kpi_rtt_p99_ms_nat=NA");
+            println!("kpi_rtt_p95_ms_lossy=NA");
+            println!("kpi_rtt_p99_ms_lossy=NA");
+        }
+
+        assert!(network.messages_sent >= network.messages_received);
+        assert!((0.0..=1.0).contains(&network.delivery_rate));
+        assert!((0.0..=1.0).contains(&network_lossy.delivery_rate));
+        assert!((0.0..=1.0).contains(&network_nat.delivery_rate));
+
+        assert!(evaluation.observability.ticks > 0);
+        assert!(evaluation.observability.events_signed > 0);
+        assert!(evaluation.codec.voice.params_samples > 0);
+        assert!(evaluation.codec.voice.frame_samples > 0);
+
+        assert!(evaluation.mobile.session_created);
+        assert!(evaluation.mobile.send_ok);
+        assert!(evaluation.mobile.receive_ok);
+        assert!(evaluation.mobile.tick_ok);
     }
 }

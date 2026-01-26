@@ -51,7 +51,6 @@ impl Frame {
         // Parse fixed header
         let header = FixedHeader::parse(buf)?;
 
-        // Validate header length
         if header.header_len as usize > buf.len() - AUTH_TAG_SIZE {
             return Err(ElaraError::InvalidWireFormat(
                 "Header length exceeds frame".into(),
