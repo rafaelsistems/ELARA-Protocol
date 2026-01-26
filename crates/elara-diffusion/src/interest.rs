@@ -7,9 +7,10 @@ use elara_core::NodeId;
 use std::collections::{HashMap, HashSet};
 
 /// Interest level - how much a node cares about a state
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum InterestLevel {
     /// No interest - don't send updates
+    #[default]
     None = 0,
     /// Low interest - send major updates only
     Low = 1,
@@ -19,12 +20,6 @@ pub enum InterestLevel {
     High = 3,
     /// Critical interest - prioritize above all else
     Critical = 4,
-}
-
-impl Default for InterestLevel {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Interest declaration from a node
