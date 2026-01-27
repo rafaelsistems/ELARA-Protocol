@@ -196,9 +196,9 @@ v1.0 (Completed) - Production
     ✅ Performance optimization
     ✅ Formal stability guarantees
 
-v0.2 (Planned) - Beta
-    ⏳ Voice codec integration
-    ⏳ Mobile SDK
+v0.2 (Completed) - Beta
+    ✅ Voice codec integration
+    ✅ Mobile SDK
 
 v0.1 (Completed) - Alpha
     ✅ End-to-end integration tests
