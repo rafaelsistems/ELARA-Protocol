@@ -16,8 +16,12 @@ elara-time = { path = "../elara-time" }
 elara-state = { path = "../elara-state" }
 elara-transport = { path = "../elara-transport" }
 elara-msp = { path = "../elara-msp" }
+elara-runtime = { path = "../elara-runtime" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [build-dependencies]
 cbindgen = "0.26"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"

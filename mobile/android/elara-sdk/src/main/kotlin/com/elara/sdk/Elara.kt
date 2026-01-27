@@ -93,6 +93,9 @@ class Identity private constructor(private val handle: Long) : AutoCloseable {
      */
     val publicKey: ByteArray
         get() = nativePublicKey(handle)
+
+    internal val internalHandle: Long
+        get() = handle
     
     /**
      * Export the identity to bytes for storage
@@ -118,15 +121,19 @@ class Session private constructor(private val handle: Long) : AutoCloseable {
         private external fun nativeDegradation(handle: Long): Int
         private external fun nativeSend(handle: Long, dest: Long, data: ByteArray): Int
         private external fun nativeReceive(handle: Long, data: ByteArray): Int
+        private external fun nativeSetSessionKey(handle: Long, sessionId: Long, key: ByteArray): Int
         private external fun nativeTick(handle: Long): Int
+        private external fun nativeSetCallback(handle: Long, callback: SessionCallback?): Int
         
         /**
          * Create a new session
          */
         fun create(identity: Identity, sessionId: Long): Session {
-            // Note: This requires access to identity's internal handle
-            // In a real implementation, we'd need a way to get this
-            throw NotImplementedError("Requires internal handle access")
+            val handle = nativeCreate(identity.internalHandle, sessionId)
+            if (handle == 0L) {
+                throw ElaraException(ErrorCode.INTERNAL_ERROR)
+            }
+            return Session(handle)
         }
     }
     
@@ -186,6 +193,15 @@ class Session private constructor(private val handle: Long) : AutoCloseable {
             Result.failure(ElaraException(ErrorCode.fromInt(result)))
         }
     }
+
+    fun setSessionKey(sessionId: SessionId, key: ByteArray): Result<Unit> {
+        val result = nativeSetSessionKey(handle, sessionId.value, key)
+        return if (result == 0) {
+            Result.success(Unit)
+        } else {
+            Result.failure(ElaraException(ErrorCode.fromInt(result)))
+        }
+    }
     
     /**
      * Tick the session (advance time)
@@ -198,10 +214,25 @@ class Session private constructor(private val handle: Long) : AutoCloseable {
             Result.failure(ElaraException(ErrorCode.fromInt(result)))
         }
     }
+
+    fun setCallback(callback: SessionCallback?): Result<Unit> {
+        val result = nativeSetCallback(handle, callback)
+        return if (result == 0) {
+            Result.success(Unit)
+        } else {
+            Result.failure(ElaraException(ErrorCode.fromInt(result)))
+        }
+    }
     
     override fun close() {
         nativeFree(handle)
     }
+}
+
+interface SessionCallback {
+    fun onMessage(source: Long, data: ByteArray)
+    fun onPresence(node: Long, presence: FloatArray)
+    fun onDegradation(level: Int)
 }
 
 /**

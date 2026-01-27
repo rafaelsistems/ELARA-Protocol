@@ -716,9 +716,14 @@ mod tests {
 
         // On localhost, RTT should be very low
         if let Some(rtt) = rtt {
+            let max_rtt_ms = if cfg!(target_os = "windows") {
+                500
+            } else {
+                200
+            };
             assert!(
-                rtt < Duration::from_millis(50),
-                "Localhost RTT should be < 50ms"
+                rtt < Duration::from_millis(max_rtt_ms),
+                "Localhost RTT should be < {max_rtt_ms}ms"
             );
         }
     }

@@ -94,6 +94,22 @@ impl Node {
         }
     }
 
+    pub fn with_identity(identity: Identity, config: NodeConfig) -> Self {
+        Node {
+            identity,
+            session_id: None,
+            time_engine: TimeEngine::new(),
+            state_engine: ReconciliationEngine::new(),
+            secure_processor: None,
+            incoming: VecDeque::new(),
+            outgoing: VecDeque::new(),
+            local_events: Vec::new(),
+            event_seq: 0,
+            config,
+            stats: RuntimeStats::default(),
+        }
+    }
+
     /// Get node ID
     pub fn node_id(&self) -> NodeId {
         self.identity.node_id()
@@ -112,6 +128,11 @@ impl Node {
             self.node_id(),
             session_key,
         ));
+    }
+
+    pub fn join_session_unsecured(&mut self, session_id: SessionId) {
+        self.session_id = Some(session_id);
+        self.secure_processor = None;
     }
 
     /// Leave current session
