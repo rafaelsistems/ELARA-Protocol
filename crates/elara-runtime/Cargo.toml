@@ -12,10 +12,12 @@ elara-crypto = { path = "../elara-crypto" }
 elara-time = { path = "../elara-time" }
 elara-state = { path = "../elara-state" }
 elara-transport = { path = "../elara-transport" }
+elara-visual = { path = "../elara-visual" }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 parking_lot = { workspace = true }
 
 [dev-dependencies]
+elara-msp = { path = "../elara-msp" }
 proptest = { workspace = true }

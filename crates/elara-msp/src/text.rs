@@ -13,6 +13,7 @@ use elara_core::{
 pub const STATE_TYPE_TEXT: u16 = 0x0001;
 pub const STATE_TYPE_PRESENCE: u16 = 0x0002;
 pub const STATE_TYPE_TYPING: u16 = 0x0003;
+pub const STATE_TYPE_FEED: u16 = 0x0004;
 
 /// Create a text stream state ID
 pub fn text_stream_id(stream_id: u64) -> StateId {
@@ -27,6 +28,10 @@ pub fn presence_id(user_id: NodeId) -> StateId {
 /// Create a typing state ID
 pub fn typing_id(user_id: NodeId) -> StateId {
     StateId::from_type_instance(STATE_TYPE_TYPING, user_id.0)
+}
+
+pub fn feed_stream_id(stream_id: u64) -> StateId {
+    StateId::from_type_instance(STATE_TYPE_FEED, stream_id)
 }
 
 /// Text message in a stream
@@ -46,6 +51,73 @@ pub struct TextMessage {
     pub edit_of: Option<MessageId>,
     /// Is this message deleted (soft delete)
     pub deleted: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct FeedItem {
+    pub id: MessageId,
+    pub author: NodeId,
+    pub content: Vec<u8>,
+    pub timestamp: StateTime,
+    pub deleted: bool,
+}
+
+impl FeedItem {
+    pub fn new(id: MessageId, author: NodeId, content: Vec<u8>, timestamp: StateTime) -> Self {
+        FeedItem {
+            id,
+            author,
+            content,
+            timestamp,
+            deleted: false,
+        }
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&self.id.0.to_le_bytes());
+        buf.extend_from_slice(&self.author.to_bytes());
+        buf.extend_from_slice(&self.timestamp.as_micros().to_le_bytes());
+        buf.push(if self.deleted { 1 } else { 0 });
+        buf.extend_from_slice(&(self.content.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&self.content);
+        buf
+    }
+
+    pub fn decode(buf: &[u8]) -> Option<(Self, usize)> {
+        if buf.len() < 27 {
+            return None;
+        }
+
+        let id = MessageId(u64::from_le_bytes(buf[0..8].try_into().ok()?));
+        let author = NodeId::from_bytes(buf[8..16].try_into().ok()?);
+        let timestamp = StateTime::from_micros(i64::from_le_bytes(buf[16..24].try_into().ok()?));
+        let deleted = buf[24] != 0;
+        let mut offset = 25;
+
+        if buf.len() < offset + 2 {
+            return None;
+        }
+        let content_len = u16::from_le_bytes(buf[offset..offset + 2].try_into().ok()?) as usize;
+        offset += 2;
+
+        if buf.len() < offset + content_len {
+            return None;
+        }
+        let content = buf[offset..offset + content_len].to_vec();
+        offset += content_len;
+
+        Some((
+            FeedItem {
+                id,
+                author,
+                content,
+                timestamp,
+                deleted,
+            },
+            offset,
+        ))
+    }
 }
 
 impl TextMessage {
@@ -175,6 +247,53 @@ pub struct TextStream {
     pub messages: Vec<TextMessage>,
     /// Maximum messages to keep
     pub max_messages: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct FeedStream {
+    pub items: Vec<FeedItem>,
+    pub max_items: usize,
+}
+
+impl FeedStream {
+    pub fn new(max_items: usize) -> Self {
+        FeedStream {
+            items: Vec::new(),
+            max_items,
+        }
+    }
+
+    pub fn append(&mut self, item: FeedItem) {
+        if self.items.iter().any(|m| m.id == item.id) {
+            return;
+        }
+
+        let pos = self
+            .items
+            .binary_search_by(|m| m.timestamp.cmp(&item.timestamp))
+            .unwrap_or_else(|p| p);
+
+        self.items.insert(pos, item);
+
+        if self.items.len() > self.max_items {
+            self.items.remove(0);
+        }
+    }
+
+    pub fn delete(&mut self, item_id: MessageId) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|m| m.id == item_id) {
+            item.deleted = true;
+            item.content.clear();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn recent(&self, count: usize) -> &[FeedItem] {
+        let start = self.items.len().saturating_sub(count);
+        &self.items[start..]
+    }
 }
 
 impl TextStream {
@@ -373,6 +492,17 @@ pub fn create_text_atom(stream_id: u64, owner: NodeId) -> StateAtom {
     atom
 }
 
+pub fn create_feed_atom(stream_id: u64, owner: NodeId) -> StateAtom {
+    let mut atom = StateAtom::new(feed_stream_id(stream_id), StateType::Core, owner);
+    atom.delta_law = DeltaLaw::AppendOnly { max_size: 5000 };
+    atom.bounds = StateBounds {
+        max_size: 5 * 1024 * 1024,
+        rate_limit: Some(elara_core::RateLimit::new(5, 1000)),
+        max_entropy: 1.0,
+    };
+    atom
+}
+
 /// Create a presence state atom
 pub fn create_presence_atom(user_id: NodeId) -> StateAtom {
     let mut atom = StateAtom::new(presence_id(user_id), StateType::Core, user_id);
@@ -441,6 +571,47 @@ mod tests {
         stream.append(msg1_dup);
 
         assert_eq!(stream.messages.len(), 2);
+    }
+
+    #[test]
+    fn test_feed_item_roundtrip() {
+        let item = FeedItem::new(
+            MessageId::new(44),
+            NodeId::new(7),
+            b"feed".to_vec(),
+            StateTime::from_millis(4000),
+        );
+
+        let encoded = item.encode();
+        let (decoded, _) = FeedItem::decode(&encoded).unwrap();
+
+        assert_eq!(decoded.id, item.id);
+        assert_eq!(decoded.author, item.author);
+        assert_eq!(decoded.content, item.content);
+    }
+
+    #[test]
+    fn test_feed_stream_append() {
+        let mut stream = FeedStream::new(10);
+
+        let item1 = FeedItem::new(
+            MessageId::new(1),
+            NodeId::new(1),
+            b"a".to_vec(),
+            StateTime::from_millis(1000),
+        );
+
+        let item2 = FeedItem::new(
+            MessageId::new(2),
+            NodeId::new(1),
+            b"b".to_vec(),
+            StateTime::from_millis(2000),
+        );
+
+        stream.append(item1);
+        stream.append(item2);
+
+        assert_eq!(stream.items.len(), 2);
     }
 
     #[test]

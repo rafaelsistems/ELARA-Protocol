@@ -7,6 +7,7 @@
 package com.elara.sdk
 
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * Main entry point for ELARA SDK
@@ -124,6 +125,8 @@ class Session private constructor(private val handle: Long) : AutoCloseable {
         private external fun nativeSetSessionKey(handle: Long, sessionId: Long, key: ByteArray): Int
         private external fun nativeTick(handle: Long): Int
         private external fun nativeSetCallback(handle: Long, callback: SessionCallback?): Int
+        private external fun nativeFeedStream(handle: Long, streamId: Long): ByteArray
+        private external fun nativeStreamMetadata(handle: Long, streamId: Long): ByteArray
         
         /**
          * Create a new session
@@ -215,6 +218,10 @@ class Session private constructor(private val handle: Long) : AutoCloseable {
         }
     }
 
+    fun feedStream(streamId: Long): ByteArray = nativeFeedStream(handle, streamId)
+
+    fun streamMetadata(streamId: Long): ByteArray = nativeStreamMetadata(handle, streamId)
+
     fun setCallback(callback: SessionCallback?): Result<Unit> {
         val result = nativeSetCallback(handle, callback)
         return if (result == 0) {
@@ -284,6 +291,74 @@ enum class DegradationLevel(val level: Int) {
         fun fromInt(value: Int): DegradationLevel {
             return entries.find { it.level == value } ?: L5_LATENT_PRESENCE
         }
+    }
+}
+
+data class FeedItem(
+    val id: Long,
+    val author: Long,
+    val content: ByteArray,
+    val timestampMicros: Long,
+    val deleted: Boolean
+)
+
+data class StreamMetadata(
+    val source: Long,
+    val startedAtMillis: Long,
+    val data: ByteArray
+)
+
+object FeedStreamParser {
+    fun decode(data: ByteArray): List<FeedItem> {
+        val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        val items = ArrayList<FeedItem>()
+        while (buffer.remaining() >= 27) {
+            val id = buffer.long
+            val author = buffer.long
+            val timestampMicros = buffer.long
+            val deleted = buffer.get().toInt() != 0
+            if (buffer.remaining() < 2) {
+                break
+            }
+            val contentLen = buffer.short.toInt() and 0xFFFF
+            if (buffer.remaining() < contentLen) {
+                break
+            }
+            val content = ByteArray(contentLen)
+            buffer.get(content)
+            items.add(
+                FeedItem(
+                    id = id,
+                    author = author,
+                    content = content,
+                    timestampMicros = timestampMicros,
+                    deleted = deleted
+                )
+            )
+        }
+        return items
+    }
+}
+
+object StreamMetadataParser {
+    fun decode(data: ByteArray): StreamMetadata? {
+        if (data.size < 20) {
+            return null
+        }
+        val buffer = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN)
+        val source = buffer.long
+        val startedAtMillis = buffer.long
+        val payloadLen = buffer.int
+        if (payloadLen < 0 || buffer.remaining() < payloadLen) {
+            return null
+        }
+        val payload = ByteArray(payloadLen)
+        buffer.get(payload)
+        return StreamMetadata(
+            source = source,
+            startedAtMillis = startedAtMillis,
+            data = payload
+        )
     }
 }
 

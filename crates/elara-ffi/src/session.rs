@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use crate::error::*;
 use crate::identity::ElaraIdentityHandle;
 use crate::types::*;
+use elara_visual::VisualEncoder;
 
 /// Opaque handle to an ELARA session
 pub struct ElaraSessionHandle {
@@ -217,6 +218,133 @@ pub unsafe extern "C" fn elara_session_clear_callbacks(handle: *mut ElaraSession
     (*handle).degradation_callback = None;
 
     0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn elara_session_visual_state_at(
+    handle: *mut ElaraSessionHandle,
+    node_id: ElaraNodeId,
+    state_time_ms: i64,
+) -> ElaraBytes {
+    if handle.is_null() {
+        set_last_error("Null handle");
+        return ElaraBytes::empty();
+    }
+
+    let target_time = elara_core::StateTime::from_millis(state_time_ms);
+    let node = elara_core::NodeId::from(node_id);
+    let state = (*handle).node.visual_state_at(node, target_time);
+    state
+        .map(|value| ElaraBytes::from_vec(VisualEncoder::encode(&value)))
+        .unwrap_or_else(ElaraBytes::empty)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn elara_session_visual_state_now(
+    handle: *mut ElaraSessionHandle,
+    node_id: ElaraNodeId,
+) -> ElaraBytes {
+    if handle.is_null() {
+        set_last_error("Null handle");
+        return ElaraBytes::empty();
+    }
+
+    let node = elara_core::NodeId::from(node_id);
+    let state = (*handle).node.visual_state_now(node);
+    state
+        .map(|value| ElaraBytes::from_vec(VisualEncoder::encode(&value)))
+        .unwrap_or_else(ElaraBytes::empty)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn elara_session_stream_visual_state_at(
+    handle: *mut ElaraSessionHandle,
+    stream_id: u64,
+    state_time_ms: i64,
+) -> ElaraBytes {
+    if handle.is_null() {
+        set_last_error("Null handle");
+        return ElaraBytes::empty();
+    }
+
+    let target_time = elara_core::StateTime::from_millis(state_time_ms);
+    let state = (*handle)
+        .node
+        .stream_visual_state_at(stream_id, target_time);
+    state
+        .map(|value| ElaraBytes::from_vec(VisualEncoder::encode(&value)))
+        .unwrap_or_else(ElaraBytes::empty)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn elara_session_stream_visual_state_now(
+    handle: *mut ElaraSessionHandle,
+    stream_id: u64,
+) -> ElaraBytes {
+    if handle.is_null() {
+        set_last_error("Null handle");
+        return ElaraBytes::empty();
+    }
+
+    let state = (*handle).node.stream_visual_state_now(stream_id);
+    state
+        .map(|value| ElaraBytes::from_vec(VisualEncoder::encode(&value)))
+        .unwrap_or_else(ElaraBytes::empty)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn elara_session_feed_stream(
+    handle: *mut ElaraSessionHandle,
+    stream_id: u64,
+) -> ElaraBytes {
+    if handle.is_null() {
+        set_last_error("Null handle");
+        return ElaraBytes::empty();
+    }
+
+    let feed_state = elara_msp::text::feed_stream_id(stream_id);
+    let stream = (*handle).node.feed_stream(feed_state);
+    if stream.items.is_empty() {
+        return ElaraBytes::empty();
+    }
+
+    let mut buf = Vec::new();
+    for item in stream.items {
+        let encoded = elara_msp::text::FeedItem {
+            id: item.id,
+            author: item.author,
+            content: item.content,
+            timestamp: item.timestamp,
+            deleted: item.deleted,
+        }
+        .encode();
+        buf.extend_from_slice(&encoded);
+    }
+
+    ElaraBytes::from_vec(buf)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn elara_session_stream_metadata(
+    handle: *mut ElaraSessionHandle,
+    stream_id: u64,
+) -> ElaraBytes {
+    if handle.is_null() {
+        set_last_error("Null handle");
+        return ElaraBytes::empty();
+    }
+
+    let Some(metadata) = (*handle).node.stream_metadata(stream_id) else {
+        return ElaraBytes::empty();
+    };
+
+    let mut buf = Vec::with_capacity(20 + metadata.data.len());
+    buf.extend_from_slice(&metadata.source.to_bytes());
+    buf.extend_from_slice(&metadata.started_at.as_millis().to_le_bytes());
+    buf.extend_from_slice(&(metadata.data.len() as u32).to_le_bytes());
+    buf.extend_from_slice(&metadata.data);
+
+    ElaraBytes::from_vec(buf)
 }
 
 /// Send a message to a peer

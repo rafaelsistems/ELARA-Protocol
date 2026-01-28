@@ -1,7 +1,8 @@
 //! State reconciliation pipeline
 
 use elara_core::{
-    AuthorityScope, Event, EventResult, RejectReason, StateAtom, StateTime, StateType, TimePosition,
+    AuthorityScope, Event, EventResult, EventType, RejectReason, StateAtom, StateTime, StateType,
+    TimePosition,
 };
 use elara_time::TimeEngine;
 
@@ -83,6 +84,12 @@ impl ReconciliationEngine {
             return EventResult::Rejected(RejectReason::CausalityViolation);
         }
 
+        // Special case: deletions should apply immediately to avoid stale atoms
+        if matches!(event.mutation, elara_core::MutationOp::Delete) {
+            self.apply_event(&event, time_engine.tau_s());
+            return EventResult::Applied;
+        }
+
         // Stage 3: Temporal Placement
         let τ_event = event.absolute_time(time_engine.tau_s());
         let position = time_engine.classify_time(τ_event);
@@ -135,13 +142,16 @@ impl ReconciliationEngine {
 
     /// Apply event directly to state
     fn apply_event(&mut self, event: &Event, now: StateTime) {
+        if matches!(event.mutation, elara_core::MutationOp::Delete) {
+            self.field.remove(event.target_state);
+            return;
+        }
+
         if let Some(atom) = self.field.get_mut(event.target_state) {
-            // Update version vector
             atom.version = atom.version.merge(&event.version_ref);
             atom.version.increment(event.source);
             atom.last_modified = now;
 
-            // Apply mutation (simplified - would use delta law)
             match &event.mutation {
                 elara_core::MutationOp::Set(data) => {
                     atom.value = data.clone();
@@ -152,19 +162,45 @@ impl ReconciliationEngine {
                 _ => {}
             }
 
-            // Reset entropy
             atom.entropy.reset();
         } else {
-            // Create new atom
-            let mut atom = StateAtom::new(event.target_state, StateType::Core, event.source);
+            let state_type = Self::state_type_for_event(event.event_type);
+            let mut atom = StateAtom::new(event.target_state, state_type, event.source);
             atom.version.increment(event.source);
             atom.last_modified = now;
 
-            if let elara_core::MutationOp::Set(data) = &event.mutation {
-                atom.value = data.clone();
+            match &event.mutation {
+                elara_core::MutationOp::Set(data) => {
+                    atom.value = data.clone();
+                }
+                elara_core::MutationOp::Append(data) => {
+                    atom.value.extend_from_slice(data);
+                }
+                _ => {}
             }
 
             self.field.insert(atom);
+        }
+    }
+
+    fn state_type_for_event(event_type: EventType) -> StateType {
+        match event_type {
+            EventType::VoiceFrame
+            | EventType::VoiceMute
+            | EventType::PresenceUpdate
+            | EventType::TypingStart
+            | EventType::TypingStop
+            | EventType::VisualKeyframe
+            | EventType::VisualDelta => StateType::Perceptual,
+            EventType::TextAppend
+            | EventType::TextEdit
+            | EventType::TextDelete
+            | EventType::TextReact
+            | EventType::FeedAppend
+            | EventType::FeedDelete
+            | EventType::StreamStart
+            | EventType::StreamEnd => StateType::Core,
+            _ => StateType::Core,
         }
     }
 
@@ -236,5 +272,64 @@ mod tests {
         let result = engine.process_events(vec![event], &time_engine);
         assert_eq!(result.applied, 1);
         assert!(engine.field().contains(StateId::new(100)));
+    }
+
+    #[test]
+    fn test_stream_start_end_creates_and_deletes_state() {
+        let mut engine = ReconciliationEngine::new();
+        let time_engine = TimeEngine::new();
+
+        let state_id = StateId::new(200);
+        let source = NodeId::new(7);
+
+        let start_event = Event::new(
+            source,
+            1,
+            EventType::StreamStart,
+            state_id,
+            MutationOp::Set(vec![9, 9, 9]),
+        );
+
+        let _ = engine.process_events(vec![start_event], &time_engine);
+        assert!(engine.field().contains(state_id));
+
+        let current_version = engine
+            .field()
+            .get(state_id)
+            .expect("atom exists")
+            .version
+            .clone();
+        let end_event = Event::new(
+            source,
+            2,
+            EventType::StreamEnd,
+            state_id,
+            MutationOp::Delete,
+        )
+        .with_version(current_version);
+        let _ = engine.process_events(vec![end_event], &time_engine);
+        assert!(!engine.field().contains(state_id));
+    }
+
+    #[test]
+    fn test_visual_keyframe_creates_perceptual_atom() {
+        let mut engine = ReconciliationEngine::new();
+        let time_engine = TimeEngine::new();
+
+        let state_id = StateId::new(300);
+        let source = NodeId::new(8);
+
+        let visual_event = Event::new(
+            source,
+            1,
+            EventType::VisualKeyframe,
+            state_id,
+            MutationOp::Set(vec![1, 2, 3, 4]),
+        );
+
+        let result = engine.process_events(vec![visual_event], &time_engine);
+        assert_eq!(result.applied, 1);
+        let atom = engine.field().get(state_id).expect("atom exists");
+        assert_eq!(atom.state_type, StateType::Perceptual);
     }
 }

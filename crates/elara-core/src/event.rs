@@ -45,6 +45,15 @@ pub enum EventType {
     PresenceUpdate = 0xA0,
     TypingStart = 0xA1,
     TypingStop = 0xA2,
+
+    VisualKeyframe = 0xB0,
+    VisualDelta = 0xB1,
+
+    StreamStart = 0xC0,
+    StreamEnd = 0xC1,
+
+    FeedAppend = 0xD0,
+    FeedDelete = 0xD1,
 }
 
 impl EventType {
@@ -72,6 +81,12 @@ impl EventType {
             0xA0 => Some(EventType::PresenceUpdate),
             0xA1 => Some(EventType::TypingStart),
             0xA2 => Some(EventType::TypingStop),
+            0xB0 => Some(EventType::VisualKeyframe),
+            0xB1 => Some(EventType::VisualDelta),
+            0xC0 => Some(EventType::StreamStart),
+            0xC1 => Some(EventType::StreamEnd),
+            0xD0 => Some(EventType::FeedAppend),
+            0xD1 => Some(EventType::FeedDelete),
             _ => None,
         }
     }
@@ -424,6 +439,9 @@ mod tests {
             EventType::StateUpdate,
             EventType::TextAppend,
             EventType::VoiceFrame,
+            EventType::VisualKeyframe,
+            EventType::StreamStart,
+            EventType::FeedAppend,
         ] {
             let byte = event_type.to_byte();
             let recovered = EventType::from_byte(byte).unwrap();

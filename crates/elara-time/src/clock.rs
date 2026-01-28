@@ -173,7 +173,7 @@ mod tests {
         assert!(t2 > t1);
         // Should be approximately 100ms later
         let diff = t2.as_micros() - t1.as_micros();
-        assert!(diff >= 99_000 && diff <= 101_000);
+        assert!((99_000..=101_000).contains(&diff));
     }
 
     #[test]
@@ -186,7 +186,7 @@ mod tests {
 
         // Should advance ~200ms
         let value = clock.now().as_micros();
-        assert!(value >= 190_000 && value <= 210_000);
+        assert!((190_000..=210_000).contains(&value));
     }
 
     #[test]

@@ -583,3 +583,60 @@ pub extern "system" fn Java_com_elara_sdk_Session_nativeSetCallback(
     map.insert(handle_ptr as usize, state_ptr);
     0
 }
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_com_elara_sdk_Session_nativeFeedStream(
+    env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    stream_id: jlong,
+) -> jbyteArray {
+    if handle == 0 {
+        return env
+            .byte_array_from_slice(&[])
+            .map(|v| v.into_raw())
+            .unwrap_or(std::ptr::null_mut());
+    }
+    let bytes =
+        unsafe { elara_session_feed_stream(handle as *mut ElaraSessionHandle, stream_id as u64) };
+    if bytes.is_empty() {
+        return env
+            .byte_array_from_slice(&[])
+            .map(|v| v.into_raw())
+            .unwrap_or(std::ptr::null_mut());
+    }
+    let slice = unsafe { std::slice::from_raw_parts(bytes.data, bytes.len) };
+    let result = env.byte_array_from_slice(slice);
+    unsafe { elara_free_bytes(bytes.data, bytes.len) };
+    result.map(|v| v.into_raw()).unwrap_or(std::ptr::null_mut())
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_com_elara_sdk_Session_nativeStreamMetadata(
+    env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    stream_id: jlong,
+) -> jbyteArray {
+    if handle == 0 {
+        return env
+            .byte_array_from_slice(&[])
+            .map(|v| v.into_raw())
+            .unwrap_or(std::ptr::null_mut());
+    }
+    let bytes = unsafe {
+        elara_session_stream_metadata(handle as *mut ElaraSessionHandle, stream_id as u64)
+    };
+    if bytes.is_empty() {
+        return env
+            .byte_array_from_slice(&[])
+            .map(|v| v.into_raw())
+            .unwrap_or(std::ptr::null_mut());
+    }
+    let slice = unsafe { std::slice::from_raw_parts(bytes.data, bytes.len) };
+    let result = env.byte_array_from_slice(slice);
+    unsafe { elara_free_bytes(bytes.data, bytes.len) };
+    result.map(|v| v.into_raw()).unwrap_or(std::ptr::null_mut())
+}

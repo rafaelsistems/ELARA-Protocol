@@ -190,6 +190,26 @@ public final class Session {
         }
     }
 
+    public func feedStream(streamId: UInt64) -> Data {
+        let bytes = elara_session_feed_stream(handle, streamId)
+        if bytes.data != nil && bytes.len > 0 {
+            let data = Data(bytes: bytes.data!, count: bytes.len)
+            elara_free_bytes(bytes.data, bytes.len)
+            return data
+        }
+        return Data()
+    }
+
+    public func streamMetadata(streamId: UInt64) -> Data {
+        let bytes = elara_session_stream_metadata(handle, streamId)
+        if bytes.data != nil && bytes.len > 0 {
+            let data = Data(bytes: bytes.data!, count: bytes.len)
+            elara_free_bytes(bytes.data, bytes.len)
+            return data
+        }
+        return Data()
+    }
+
     public func setCallback(_ callback: SessionCallback?) throws {
         clearCallback()
         guard let callback = callback else {
@@ -237,6 +257,102 @@ public protocol SessionCallback: AnyObject {
     func onMessage(source: NodeId, data: Data)
     func onPresence(node: NodeId, presence: Presence)
     func onDegradation(level: DegradationLevel)
+}
+
+public struct FeedItem {
+    public let id: UInt64
+    public let author: UInt64
+    public let content: Data
+    public let timestampMicros: Int64
+    public let deleted: Bool
+}
+
+public struct StreamMetadata {
+    public let source: UInt64
+    public let startedAtMillis: Int64
+    public let data: Data
+}
+
+public func decodeFeedStream(_ data: Data) -> [FeedItem] {
+    let bytes = [UInt8](data)
+    var offset = 0
+    var items: [FeedItem] = []
+    while offset + 27 <= bytes.count {
+        let id = readUInt64(bytes, &offset)
+        let author = readUInt64(bytes, &offset)
+        let timestampMicros = readInt64(bytes, &offset)
+        let deleted = readUInt8(bytes, &offset) != 0
+        if offset + 2 > bytes.count {
+            break
+        }
+        let contentLen = Int(readUInt16(bytes, &offset))
+        if offset + contentLen > bytes.count {
+            break
+        }
+        let content = Data(bytes[offset..<(offset + contentLen)])
+        offset += contentLen
+        items.append(
+            FeedItem(
+                id: id,
+                author: author,
+                content: content,
+                timestampMicros: timestampMicros,
+                deleted: deleted
+            )
+        )
+    }
+    return items
+}
+
+public func decodeStreamMetadata(_ data: Data) -> StreamMetadata? {
+    let bytes = [UInt8](data)
+    if bytes.count < 20 {
+        return nil
+    }
+    var offset = 0
+    let source = readUInt64(bytes, &offset)
+    let startedAtMillis = readInt64(bytes, &offset)
+    let payloadLen = Int(readUInt32(bytes, &offset))
+    if payloadLen < 0 || offset + payloadLen > bytes.count {
+        return nil
+    }
+    let payload = Data(bytes[offset..<(offset + payloadLen)])
+    return StreamMetadata(source: source, startedAtMillis: startedAtMillis, data: payload)
+}
+
+private func readUInt8(_ bytes: [UInt8], _ offset: inout Int) -> UInt8 {
+    let value = bytes[offset]
+    offset += 1
+    return value
+}
+
+private func readUInt16(_ bytes: [UInt8], _ offset: inout Int) -> UInt16 {
+    let value = UInt16(bytes[offset]) | (UInt16(bytes[offset + 1]) << 8)
+    offset += 2
+    return value
+}
+
+private func readUInt32(_ bytes: [UInt8], _ offset: inout Int) -> UInt32 {
+    var value: UInt32 = 0
+    for i in 0..<4 {
+        value |= UInt32(bytes[offset + i]) << (8 * i)
+    }
+    offset += 4
+    return value
+}
+
+private func readUInt64(_ bytes: [UInt8], _ offset: inout Int) -> UInt64 {
+    var value: UInt64 = 0
+    for i in 0..<8 {
+        value |= UInt64(bytes[offset + i]) << (8 * i)
+    }
+    offset += 8
+    return value
+}
+
+private func readInt64(_ bytes: [UInt8], _ offset: inout Int) -> Int64 {
+    let value = readUInt64(bytes, &offset)
+    return Int64(bitPattern: value)
 }
 
 public final class AudioLoopback: SessionCallback {

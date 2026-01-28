@@ -2,7 +2,7 @@
 //!
 //! This is NOT a video frame. This is the STATE of what is visually happening.
 
-use elara_core::{DegradationLevel, NodeId, StateTime};
+use elara_core::{DegradationLevel, NodeId, StateId, StateTime};
 
 use crate::{FaceState, PoseState, SceneState};
 
@@ -14,6 +14,21 @@ impl VisualStateId {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
+}
+
+pub const STATE_TYPE_VISUAL: u16 = 0x0020;
+pub const STATE_TYPE_LIVESTREAM: u16 = 0x0021;
+
+pub fn visual_state_id(node_id: NodeId) -> StateId {
+    StateId::from_type_instance(STATE_TYPE_VISUAL, node_id.0)
+}
+
+pub fn stream_visual_state_id(stream_id: u64) -> StateId {
+    StateId::from_type_instance(STATE_TYPE_VISUAL, stream_id)
+}
+
+pub fn livestream_state_id(stream_id: u64) -> StateId {
+    StateId::from_type_instance(STATE_TYPE_LIVESTREAM, stream_id)
 }
 
 /// The complete visual state of a node

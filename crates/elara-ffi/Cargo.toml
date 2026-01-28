@@ -17,6 +17,7 @@ elara-state = { path = "../elara-state" }
 elara-transport = { path = "../elara-transport" }
 elara-msp = { path = "../elara-msp" }
 elara-runtime = { path = "../elara-runtime" }
+elara-visual = { path = "../elara-visual" }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 
