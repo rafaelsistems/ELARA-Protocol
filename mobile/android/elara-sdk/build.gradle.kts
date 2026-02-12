@@ -49,6 +49,11 @@ tasks.register<Exec>("cargoBuild") {
     outputs.dir(outputDir)
 }
 
+dependencies {
+    // ML Kit Face Detection (for ElaraBeautyFilter)
+    implementation("com.google.mlkit:face-detection:16.1.5")
+}
+
 tasks.named("preBuild") {
     dependsOn("cargoBuild")
 }
