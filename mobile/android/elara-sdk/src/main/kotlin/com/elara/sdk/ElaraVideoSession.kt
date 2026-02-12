@@ -301,6 +301,8 @@ class ElaraVideoSession(
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to connect ELARA session", e)
+                // Tear down any partially started resources
+                close()
                 mainHandler.post { callback.onError("ELARA connect failed: ${e.message}") }
             }
         }.start()
