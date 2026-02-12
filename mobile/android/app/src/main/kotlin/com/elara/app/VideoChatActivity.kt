@@ -200,8 +200,11 @@ class VideoChatActivity : Activity() {
     }
 
     override fun onDestroy() {
+        val sid = session?.sessionId
         session?.close()
         session = null
+        // Clear registry to prevent leaking view/activity references
+        if (sid != null) ElaraViewRegistry.clearSession(sid)
         super.onDestroy()
     }
 }
