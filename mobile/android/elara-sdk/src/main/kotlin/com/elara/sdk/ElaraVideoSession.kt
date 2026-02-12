@@ -555,10 +555,12 @@ class ElaraVideoSession(
                     }
                     if (newQuality != currentQuality) {
                         currentQuality = newQuality
+                        // Always emit quality changes to listeners
+                        mainHandler.post { eventListener?.onQualityChanged(newQuality) }
+                        // Update coarse status bucket separately
                         val newStatus = if (newQuality < 50) Status.DEGRADED else Status.CONNECTED
                         if (newStatus != status && status != Status.DISCONNECTED) {
                             status = newStatus
-                            mainHandler.post { eventListener?.onQualityChanged(newQuality) }
                         }
                     }
                     Thread.sleep(tickIntervalMs)
