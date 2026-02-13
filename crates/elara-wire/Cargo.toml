@@ -4,9 +4,12 @@ description = "ELARA Protocol - Wire format and packet encoding"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
 
 [dependencies]
-elara-core = { path = "../elara-core" }
+elara-core = { path = "../elara-core", version = "0.1.0" }
 bytes = { workspace = true }
 thiserror = { workspace = true }
 

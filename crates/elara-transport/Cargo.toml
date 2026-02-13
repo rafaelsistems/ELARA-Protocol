@@ -1,13 +1,19 @@
 [package]
 name = "elara-transport"
-description = "ELARA Protocol - Transport layer (UDP, multi-path)"
+description = "ELARA Protocol - Transport layer (UDP, STUN, multi-path)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["udp", "transport", "stun", "nat", "elara"]
+categories = ["network-programming"]
 
 [dependencies]
-elara-core = { path = "../elara-core" }
-elara-wire = { path = "../elara-wire" }
+elara-core = { path = "../elara-core", version = "0.1.0" }
+elara-wire = { path = "../elara-wire", version = "0.1.0" }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
