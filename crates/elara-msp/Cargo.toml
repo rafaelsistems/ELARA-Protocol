@@ -1,17 +1,24 @@
 [package]
 name = "elara-msp"
-description = "ELARA Protocol - Minimal Survival Profile (text + voice)"
+description = "ELARA Protocol - Minimal Survival Profile with text streams, voice processing, and degradation management"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors = ["ELARA Protocol Contributors"]
+repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
+documentation = "https://docs.rs/elara-msp"
+readme = "README.md"
+keywords = ["elara", "msp", "text", "voice", "streams"]
+categories = ["network-programming", "multimedia"]
+rust-version = "1.75"
 
 [dependencies]
-elara-core = { path = "../elara-core" }
-elara-wire = { path = "../elara-wire" }
-elara-crypto = { path = "../elara-crypto" }
-elara-time = { path = "../elara-time" }
-elara-state = { path = "../elara-state" }
-elara-runtime = { path = "../elara-runtime" }
+elara-core = "0.1.0"
+elara-wire = "0.1.0"
+elara-crypto = "0.1.0"
+elara-time = "0.1.0"
+elara-state = "0.1.0"
 thiserror = { workspace = true }
 
 [dev-dependencies]
