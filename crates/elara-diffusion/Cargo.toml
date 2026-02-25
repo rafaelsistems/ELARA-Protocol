@@ -2,10 +2,18 @@
 name = "elara-diffusion"
 version = "0.1.0"
 edition = "2021"
-description = "ELARA Swarm Diffusion - State propagation for livestream and group"
+description = "ELARA Protocol - Swarm diffusion engine for state propagation, livestream distribution, and group communication"
 license = "MIT OR Apache-2.0"
+authors = ["ELARA Protocol Contributors"]
+repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
+documentation = "https://docs.rs/elara-diffusion"
+readme = "README.md"
+keywords = ["elara", "diffusion", "swarm", "propagation", "livestream"]
+categories = ["network-programming", "algorithms"]
+rust-version = "1.75"
 
 [dependencies]
-elara-core = { path = "../elara-core" }
+elara-core = "0.1.0"
 
 [dev-dependencies]
