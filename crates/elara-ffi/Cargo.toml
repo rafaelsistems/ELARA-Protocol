@@ -1,23 +1,31 @@
 [package]
 name = "elara-ffi"
-description = "ELARA Protocol - Foreign Function Interface for mobile SDKs"
+description = "ELARA Protocol - Foreign Function Interface for mobile SDKs with C bindings and platform-specific integrations"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors = ["ELARA Protocol Contributors"]
+repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
+documentation = "https://docs.rs/elara-ffi"
+readme = "README.md"
+keywords = ["elara", "ffi", "mobile", "sdk", "bindings"]
+categories = ["api-bindings", "development-tools::ffi"]
+rust-version = "1.75"
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-elara-core = { path = "../elara-core" }
-elara-wire = { path = "../elara-wire" }
-elara-crypto = { path = "../elara-crypto" }
-elara-time = { path = "../elara-time" }
-elara-state = { path = "../elara-state" }
-elara-transport = { path = "../elara-transport" }
-elara-msp = { path = "../elara-msp" }
-elara-runtime = { path = "../elara-runtime" }
-elara-visual = { path = "../elara-visual" }
+elara-core = "0.1.0"
+elara-wire = "0.1.0"
+elara-crypto = "0.1.0"
+elara-time = "0.1.0"
+elara-state = "0.1.0"
+elara-transport = "0.1.0"
+elara-msp = "0.1.0"
+elara-runtime = "0.1.0"
+elara-visual = "0.1.0"
 thiserror = { workspace = true }
 tokio = { workspace = true }
 
