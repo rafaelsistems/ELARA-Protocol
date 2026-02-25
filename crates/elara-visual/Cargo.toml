@@ -2,10 +2,18 @@
 name = "elara-visual"
 version = "0.1.0"
 edition = "2021"
-description = "ELARA Visual State - Video as state, not stream"
+description = "ELARA Protocol - Visual processing with keyframe encoding, prediction, and degradation"
 license = "MIT OR Apache-2.0"
+authors = ["ELARA Protocol Contributors"]
+repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
+documentation = "https://docs.rs/elara-visual"
+readme = "README.md"
+keywords = ["elara", "visual", "video", "encoding", "prediction"]
+categories = ["multimedia", "encoding"]
+rust-version = "1.75"
 
 [dependencies]
-elara-core = { path = "../elara-core" }
+elara-core = "0.1.0"
 
 [dev-dependencies]
