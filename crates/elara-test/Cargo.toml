@@ -10,7 +10,7 @@ homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-test"
 readme = "README.md"
 keywords = ["elara", "test", "chaos", "benchmark", "harness"]
-categories = ["development-tools", "testing"]
+categories = ["development-tools", "development-tools::testing"]
 rust-version = "1.75"
 
 [dependencies]

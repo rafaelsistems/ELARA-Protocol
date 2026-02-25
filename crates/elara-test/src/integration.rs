@@ -6,8 +6,8 @@
 //! - Degradation ladder compliance
 //! - Invariant verification
 
-use std::ffi::c_void;
-use std::sync::atomic::{AtomicUsize, Ordering};
+// use std::ffi::c_void;  // Commented out until FFI is enabled
+// use std::sync::atomic::{AtomicUsize, Ordering};  // Commented out until FFI is enabled
 
 use elara_core::{
     DegradationLevel, Event, EventType, MutationOp, NodeId, PresenceVector, SessionId, StateId,
@@ -28,7 +28,7 @@ use crate::chaos::{ChaosConfig, ChaosNetwork};
 use crate::chaos_harness::{ChaosHarness, ChaosHarnessResult};
 use crate::network_test::{NetworkTestConfig, NetworkTestHarness, NetworkTestResult};
 
-static MESSAGE_CALLBACK_COUNT: AtomicUsize = AtomicUsize::new(0);
+// static MESSAGE_CALLBACK_COUNT: AtomicUsize = AtomicUsize::new(0);  // Commented out until FFI is enabled
 
 // FFI test functions commented out until elara-ffi is published
 // extern "C" fn message_callback(
