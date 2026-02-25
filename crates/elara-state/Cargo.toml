@@ -1,13 +1,21 @@
 [package]
 name = "elara-state"
-description = "ELARA Protocol - State Engine (reconciliation, divergence, partition)"
+description = "ELARA Protocol - State field engine with CRDT reconciliation, divergence control, and partition tolerance"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors = ["ELARA Protocol Contributors"]
+repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
+documentation = "https://docs.rs/elara-state"
+readme = "README.md"
+keywords = ["elara", "state", "crdt", "reconciliation", "convergence"]
+categories = ["algorithms", "data-structures"]
+rust-version = "1.75"
 
 [dependencies]
-elara-core = { path = "../elara-core" }
-elara-time = { path = "../elara-time" }
+elara-core = "0.1.0"
+elara-time = "0.1.0"
 thiserror = { workspace = true }
 parking_lot = { workspace = true }
 
