@@ -1,13 +1,21 @@
 [package]
 name = "elara-crypto"
-description = "ELARA Protocol - Cryptographic engine"
+description = "ELARA Protocol - Cryptographic engine with identity binding, multi-ratchet encryption, and post-quantum ready security"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors = ["ELARA Protocol Contributors"]
+repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
+documentation = "https://docs.rs/elara-crypto"
+readme = "README.md"
+keywords = ["elara", "protocol", "cryptography", "encryption", "identity", "ratchet", "p2p"]
+categories = ["cryptography", "network-programming"]
+rust-version = "1.75"
 
 [dependencies]
-elara-core = { path = "../elara-core" }
-elara-wire = { path = "../elara-wire" }
+elara-core = "0.1.0"
+elara-wire = "0.1.0"
 rand = { workspace = true }
 chacha20poly1305 = { workspace = true }
 x25519-dalek = { workspace = true }
