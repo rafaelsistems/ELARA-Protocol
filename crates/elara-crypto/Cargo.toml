@@ -9,7 +9,7 @@ repository = "https://github.com/rafaelsistems/ELARA-Protocol"
 homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-crypto"
 readme = "README.md"
-keywords = ["elara", "protocol", "cryptography", "encryption", "identity", "ratchet", "p2p"]
+keywords = ["elara", "cryptography", "encryption", "identity", "ratchet"]
 categories = ["cryptography", "network-programming"]
 rust-version = "1.75"
 
