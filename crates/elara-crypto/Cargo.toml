@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors = ["ELARA Protocol Contributors"]
-repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+repository.workspace = true
 homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-crypto"
 readme = "README.md"
@@ -14,8 +14,8 @@ categories = ["cryptography", "network-programming"]
 rust-version = "1.75"
 
 [dependencies]
-elara-core = "0.1.0"
-elara-wire = "0.1.0"
+elara-core = { version = "0.2.0", path = "../elara-core" }
+elara-wire = { version = "0.2.0", path = "../elara-wire" }
 rand = { workspace = true }
 chacha20poly1305 = { workspace = true }
 x25519-dalek = { workspace = true }
@@ -23,6 +23,7 @@ ed25519-dalek = { workspace = true }
 sha2 = { workspace = true }
 hkdf = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

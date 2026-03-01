@@ -27,6 +27,12 @@ pub struct SecureFrameProcessor {
 impl SecureFrameProcessor {
     /// Create a new secure frame processor
     pub fn new(session_id: SessionId, local_node_id: NodeId, session_key: [u8; KEY_SIZE]) -> Self {
+        tracing::info!(
+            session_id = session_id.0,
+            node_id = local_node_id.0,
+            "Creating secure frame processor"
+        );
+
         SecureFrameProcessor {
             session_id,
             local_node_id,
@@ -53,6 +59,16 @@ impl SecureFrameProcessor {
         extensions: Extensions,
         payload: &[u8],
     ) -> ElaraResult<Vec<u8>> {
+        let payload_size = payload.len();
+        
+        tracing::debug!(
+            session_id = self.session_id.0,
+            node_id = self.local_node_id.0,
+            class = ?class,
+            payload_size = payload_size,
+            "Encrypting frame"
+        );
+
         // Get message key from ratchet
         let key = self.ratchet.next_message_key(class);
         let cipher = AeadCipher::new(&key);
@@ -87,16 +103,38 @@ impl SecureFrameProcessor {
             .payload(ciphertext)
             .build();
 
-        frame.serialize()
+        let result = frame.serialize()?;
+        
+        tracing::debug!(
+            session_id = self.session_id.0,
+            node_id = self.local_node_id.0,
+            seq = seq,
+            encrypted_size = result.len(),
+            "Frame encrypted successfully"
+        );
+
+        Ok(result)
     }
 
     /// Decrypt a received frame
     pub fn decrypt_frame(&mut self, data: &[u8]) -> ElaraResult<DecryptedFrame> {
+        
+        tracing::debug!(
+            session_id = self.session_id.0,
+            data_size = data.len(),
+            "Decrypting frame"
+        );
+
         // Parse frame structure
         let frame = Frame::parse(data)?;
 
         // Check session ID
         if frame.header.session_id != self.session_id {
+            tracing::warn!(
+                expected_session = self.session_id.0,
+                received_session = frame.header.session_id.0,
+                "Session ID mismatch"
+            );
             return Err(ElaraError::SessionMismatch);
         }
 
@@ -105,7 +143,16 @@ impl SecureFrameProcessor {
         let class = frame.header.class;
         let node_id = frame.header.node_id;
 
-        self.replay_manager.accept(node_id, class, seq)?;
+        if let Err(e) = self.replay_manager.accept(node_id, class, seq) {
+            tracing::warn!(
+                node_id = node_id.0,
+                class = ?class,
+                seq = seq,
+                error = ?e,
+                "Replay protection rejected frame"
+            );
+            return Err(e);
+        }
 
         // Get decryption key (need to sync ratchet if needed)
         let ratchet = self.ratchet.get(class);
@@ -119,10 +166,28 @@ impl SecureFrameProcessor {
         let aad = &data[..FIXED_HEADER_SIZE];
 
         // Decrypt payload (ciphertext includes auth tag)
-        let plaintext = cipher.decrypt(&nonce, aad, &frame.payload)?;
+        let plaintext = cipher.decrypt(&nonce, aad, &frame.payload).map_err(|e| {
+            tracing::error!(
+                node_id = node_id.0,
+                session_id = self.session_id.0,
+                seq = seq,
+                error = ?e,
+                "Frame decryption failed"
+            );
+            e
+        })?;
 
         // Advance ratchet after successful decryption
         self.ratchet.get_mut(class).advance_message();
+
+        tracing::debug!(
+            node_id = node_id.0,
+            session_id = self.session_id.0,
+            seq = seq,
+            class = ?class,
+            payload_size = plaintext.len(),
+            "Frame decrypted successfully"
+        );
 
         Ok(DecryptedFrame {
             header: frame.header,
@@ -144,6 +209,11 @@ impl SecureFrameProcessor {
 
     /// Remove replay state for a node (on disconnect)
     pub fn remove_peer(&mut self, node_id: NodeId) {
+        tracing::info!(
+            session_id = self.session_id.0,
+            peer_id = node_id.0,
+            "Removing peer replay state"
+        );
         self.replay_manager.remove_node(node_id);
     }
 }

@@ -103,6 +103,11 @@ impl StateField {
         ready.into_iter().map(|e| e.event_data).collect()
     }
 
+    /// Get the number of quarantined events
+    pub fn quarantine_size(&self) -> usize {
+        self.quarantine.len()
+    }
+
     /// Calculate total memory usage
     pub fn memory_size(&self) -> usize {
         self.atoms.values().map(|a| a.memory_size()).sum()

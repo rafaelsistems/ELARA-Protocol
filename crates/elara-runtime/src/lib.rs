@@ -15,5 +15,8 @@
 //! 12. Schedule transmission
 
 pub mod node;
+pub mod observability;
+pub mod health;
+pub mod health_server;
 
 pub use node::*;

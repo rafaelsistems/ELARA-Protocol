@@ -18,13 +18,36 @@ pub struct UdpTransport {
 impl UdpTransport {
     /// Bind to a local address
     pub async fn bind(addr: SocketAddr) -> ElaraResult<Self> {
+        tracing::info!(
+            bind_addr = %addr,
+            "Attempting to bind UDP transport"
+        );
+
         let socket = UdpSocket::bind(addr)
             .await
-            .map_err(|e| ElaraError::TransportError(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!(
+                    bind_addr = %addr,
+                    error = %e,
+                    "Failed to bind UDP socket"
+                );
+                ElaraError::TransportError(e.to_string())
+            })?;
 
         let local_addr = socket
             .local_addr()
-            .map_err(|e| ElaraError::TransportError(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!(
+                    error = %e,
+                    "Failed to get local address"
+                );
+                ElaraError::TransportError(e.to_string())
+            })?;
+
+        tracing::info!(
+            local_addr = %local_addr,
+            "UDP transport bound successfully"
+        );
 
         Ok(UdpTransport {
             socket: Arc::new(socket),
@@ -40,10 +63,27 @@ impl UdpTransport {
     /// Send a frame to a destination
     pub async fn send_to(&self, frame: &Frame, dest: SocketAddr) -> ElaraResult<()> {
         let bytes = frame.serialize()?;
+        let size = bytes.len();
+
+        tracing::debug!(
+            dest = %dest,
+            size = size,
+            "Sending frame"
+        );
+
         self.socket
             .send_to(&bytes, dest)
             .await
-            .map_err(|e| ElaraError::TransportError(e.to_string()))?;
+            .map_err(|e| {
+                tracing::warn!(
+                    dest = %dest,
+                    size = size,
+                    error = %e,
+                    "Failed to send frame"
+                );
+                ElaraError::TransportError(e.to_string())
+            })?;
+
         Ok(())
     }
 
@@ -63,9 +103,22 @@ impl UdpTransport {
             .socket
             .recv_from(&mut buf)
             .await
-            .map_err(|e| ElaraError::TransportError(e.to_string()))?;
+            .map_err(|e| {
+                tracing::warn!(
+                    error = %e,
+                    "Failed to receive from UDP socket"
+                );
+                ElaraError::TransportError(e.to_string())
+            })?;
+
+        tracing::debug!(
+            source = %addr,
+            size = len,
+            "Received frame"
+        );
 
         let frame = Frame::parse(&buf[..len])?;
+
         Ok((frame, addr))
     }
 

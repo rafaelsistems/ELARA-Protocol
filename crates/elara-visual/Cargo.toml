@@ -1,11 +1,11 @@
 [package]
 name = "elara-visual"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 description = "ELARA Protocol - Visual processing with keyframe encoding, prediction, and degradation"
-license = "MIT OR Apache-2.0"
+license.workspace = true
 authors = ["ELARA Protocol Contributors"]
-repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+repository.workspace = true
 homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-visual"
 readme = "README.md"
@@ -14,6 +14,6 @@ categories = ["multimedia", "encoding"]
 rust-version = "1.75"
 
 [dependencies]
-elara-core = "0.1.0"
+elara-core = { version = "0.2.0", path = "../elara-core" }
 
 [dev-dependencies]

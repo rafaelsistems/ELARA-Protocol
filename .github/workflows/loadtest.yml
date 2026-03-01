@@ -1,0 +1,200 @@
+name: Load Tests
+
+on:
+  # Run nightly at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Load test scenario to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - small
+          - medium
+          - large
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  load-test-small:
+    name: Small Deployment (10 nodes)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.scenario == 'all' || github.event.inputs.scenario == 'small'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Build load test binary
+        run: cargo build --release -p elara-loadtest
+      
+      - name: Run small deployment load test
+        run: |
+          cargo run --release -p elara-loadtest --example small_deployment > loadtest-small.txt 2>&1
+          cat loadtest-small.txt
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loadtest-small-results
+          path: loadtest-small.txt
+          retention-days: 90
+  
+  load-test-medium:
+    name: Medium Deployment (100 nodes)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.scenario == 'all' || github.event.inputs.scenario == 'medium'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Build load test binary
+        run: cargo build --release -p elara-loadtest
+      
+      - name: Run medium deployment load test
+        run: |
+          cargo run --release -p elara-loadtest --example medium_deployment > loadtest-medium.txt 2>&1
+          cat loadtest-medium.txt
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loadtest-medium-results
+          path: loadtest-medium.txt
+          retention-days: 90
+  
+  load-test-large:
+    name: Large Deployment (1000 nodes)
+    runs-on: ubuntu-latest-8-cores
+    if: github.event_name == 'schedule' || github.event.inputs.scenario == 'all' || github.event.inputs.scenario == 'large'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Build load test binary
+        run: cargo build --release -p elara-loadtest
+      
+      - name: Run large deployment load test
+        run: |
+          cargo run --release -p elara-loadtest --example large_deployment > loadtest-large.txt 2>&1
+          cat loadtest-large.txt
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loadtest-large-results
+          path: loadtest-large.txt
+          retention-days: 90
+  
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [load-test-small, load-test-medium, load-test-large]
+    if: failure()
+    
+    steps:
+      - name: Create issue on failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `Load Test Failure - ${new Date().toISOString().split('T')[0]}`;
+            const body = `Load tests failed in nightly run.
+            
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            
+            Please investigate the failure and check the uploaded artifacts for detailed results.`;
+            
+            // Check if an issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'load-test-failure'
+            });
+            
+            const existingIssue = issues.data.find(issue => issue.title === title);
+            
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['load-test-failure', 'automated']
+              });
+            }

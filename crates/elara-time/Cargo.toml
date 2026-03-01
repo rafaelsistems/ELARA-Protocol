@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors = ["ELARA Protocol Contributors"]
-repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+repository.workspace = true
 homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-time"
 readme = "README.md"
@@ -14,7 +14,7 @@ categories = ["algorithms", "network-programming"]
 rust-version = "1.75"
 
 [dependencies]
-elara-core = "0.1.0"
+elara-core = { version = "0.2.0", path = "../elara-core" }
 thiserror = { workspace = true }
 parking_lot = { workspace = true }
 

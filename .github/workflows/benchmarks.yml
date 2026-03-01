@@ -1,0 +1,178 @@
+name: Benchmarks
+
+on:
+  # Run on performance-critical changes
+  push:
+    branches: [main, develop]
+    paths:
+      - 'crates/elara-wire/**'
+      - 'crates/elara-crypto/**'
+      - 'crates/elara-state/**'
+      - 'crates/elara-time/**'
+      - 'crates/elara-bench/**'
+      - '.github/workflows/benchmarks.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'crates/elara-wire/**'
+      - 'crates/elara-crypto/**'
+      - 'crates/elara-state/**'
+      - 'crates/elara-time/**'
+      - 'crates/elara-bench/**'
+  # Allow manual trigger
+  workflow_dispatch:
+  # Run weekly to track performance over time
+  schedule:
+    - cron: '0 2 * * 1' # Every Monday at 2 AM UTC
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for baseline comparison
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-target-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-target-bench-
+
+      - name: Run wire protocol benchmarks
+        run: cargo bench --package elara-bench --bench wire_protocol -- --output-format bencher | tee wire_results.txt
+
+      - name: Run crypto benchmarks
+        run: cargo bench --package elara-bench --bench crypto_operations -- --output-format bencher | tee crypto_results.txt
+
+      - name: Run state benchmarks
+        run: cargo bench --package elara-bench --bench state_reconciliation -- --output-format bencher | tee state_results.txt
+
+      - name: Run time engine benchmarks
+        run: cargo bench --package elara-bench --bench time_engine -- --output-format bencher | tee time_results.txt
+
+      - name: Download baseline results
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: baseline/
+
+      - name: Compare with baseline
+        id: compare
+        continue-on-error: true
+        run: |
+          if [ -d "baseline" ]; then
+            echo "Comparing with baseline..."
+            
+            # Simple regression detection (>10% threshold)
+            # This is a placeholder - in production, use a proper tool like critcmp
+            
+            echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Wire Protocol" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -20 wire_results.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "### Crypto Operations" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -20 crypto_results.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "### State Reconciliation" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -20 state_results.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "### Time Engine" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            head -20 time_results.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            
+            # TODO: Implement proper regression detection
+            # For now, just note that comparison was attempted
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "ℹ️ Baseline comparison attempted. Implement regression detection for production use." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No baseline found. This will become the new baseline." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload benchmark results as baseline
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: |
+            wire_results.txt
+            crypto_results.txt
+            state_results.txt
+            time_results.txt
+          retention-days: 90
+
+      - name: Upload HTML reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports
+          path: target/criterion/
+          retention-days: 30
+
+      - name: Check for regressions
+        if: steps.compare.outcome == 'success'
+        run: |
+          # Placeholder for regression detection
+          # In production, implement proper statistical comparison
+          # Exit with error if regression >10% detected
+          echo "Regression check placeholder - implement proper detection"
+          # exit 1 if regression detected
+
+  benchmark-summary:
+    name: Benchmark Summary
+    runs-on: ubuntu-latest
+    needs: benchmark
+    if: always()
+    
+    steps:
+      - name: Summary
+        run: |
+          echo "## Benchmark Workflow Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Benchmark results have been generated and uploaded as artifacts." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download HTML reports from artifacts for detailed analysis" >> $GITHUB_STEP_SUMMARY
+          echo "2. Review performance trends over time" >> $GITHUB_STEP_SUMMARY
+          echo "3. Investigate any significant performance changes" >> $GITHUB_STEP_SUMMARY

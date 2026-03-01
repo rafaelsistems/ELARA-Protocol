@@ -1,0 +1,220 @@
+# Example Prometheus Configuration for ELARA Protocol
+#
+# This configuration shows how to set up Prometheus to scrape ELARA node metrics
+# and evaluate the alerting rules defined in alerts.yml.
+#
+# Copy this file to prometheus.yml and customize for your environment.
+
+global:
+  # How frequently to scrape targets
+  scrape_interval: 15s
+  
+  # How frequently to evaluate rules
+  evaluation_interval: 15s
+  
+  # Attach these labels to any time series or alerts
+  external_labels:
+    cluster: 'elara-production'
+    environment: 'production'
+    region: 'us-east-1'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+      # Timeout for sending alerts
+      timeout: 10s
+      # API version (v1 or v2)
+      api_version: v2
+
+# Load alerting rules
+rule_files:
+  - 'alerts.yml'
+  # Add additional rule files here
+  # - 'recording-rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Scrape Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Scrape ELARA nodes - static configuration
+  - job_name: 'elara-nodes-static'
+    static_configs:
+      - targets:
+          - 'elara-node-1.example.com:9090'
+          - 'elara-node-2.example.com:9090'
+          - 'elara-node-3.example.com:9090'
+        labels:
+          cluster: 'elara-production'
+          datacenter: 'dc1'
+      
+      - targets:
+          - 'elara-node-4.example.com:9090'
+          - 'elara-node-5.example.com:9090'
+        labels:
+          cluster: 'elara-production'
+          datacenter: 'dc2'
+    
+    # Relabel to extract node_id from instance
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      
+      - source_labels: [__address__]
+        regex: '([^:]+):.*'
+        target_label: node_id
+        replacement: '$1'
+    
+    # Scrape configuration
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: '/metrics'
+    scheme: http
+
+  # Scrape ELARA nodes - DNS service discovery
+  - job_name: 'elara-nodes-dns'
+    dns_sd_configs:
+      - names:
+          - 'elara-nodes.example.com'
+        type: 'A'
+        port: 9090
+        refresh_interval: 30s
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      
+      - source_labels: [__address__]
+        regex: '([^:]+):.*'
+        target_label: node_id
+        replacement: '$1'
+
+  # Scrape ELARA nodes - Kubernetes service discovery
+  - job_name: 'elara-nodes-k8s'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - elara-production
+    
+    relabel_configs:
+      # Only scrape pods with the elara-node label
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        action: keep
+        regex: elara-node
+      
+      # Use pod name as node_id
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: node_id
+      
+      # Use pod IP and port
+      - source_labels: [__meta_kubernetes_pod_ip]
+        target_label: __address__
+        replacement: '$1:9090'
+      
+      # Add namespace label
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      
+      # Add pod name label
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+
+  # Scrape ELARA nodes - Consul service discovery
+  - job_name: 'elara-nodes-consul'
+    consul_sd_configs:
+      - server: 'consul.example.com:8500'
+        services:
+          - elara-node
+        tags:
+          - production
+    
+    relabel_configs:
+      - source_labels: [__meta_consul_service]
+        target_label: job
+      
+      - source_labels: [__meta_consul_node]
+        target_label: node_id
+      
+      - source_labels: [__meta_consul_tags]
+        target_label: tags
+
+  # Scrape ELARA health endpoints
+  - job_name: 'elara-health'
+    static_configs:
+      - targets:
+          - 'elara-node-1.example.com:8080'
+          - 'elara-node-2.example.com:8080'
+          - 'elara-node-3.example.com:8080'
+    
+    metrics_path: '/health'
+    scrape_interval: 30s
+    scrape_timeout: 5s
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^:]+):.*'
+        target_label: node_id
+        replacement: '$1'
+
+  # Scrape node exporters for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+          - 'elara-node-1.example.com:9100'
+          - 'elara-node-2.example.com:9100'
+          - 'elara-node-3.example.com:9100'
+    
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '([^:]+):.*'
+        target_label: node_id
+        replacement: '$1'
+
+# Remote write configuration (optional)
+# Uncomment to send metrics to remote storage
+# remote_write:
+#   - url: 'http://remote-storage:9009/api/v1/push'
+#     queue_config:
+#       capacity: 10000
+#       max_shards: 10
+#       min_shards: 1
+#       max_samples_per_send: 5000
+#       batch_send_deadline: 5s
+#       min_backoff: 30ms
+#       max_backoff: 100ms
+
+# Remote read configuration (optional)
+# Uncomment to read metrics from remote storage
+# remote_read:
+#   - url: 'http://remote-storage:9009/api/v1/read'
+#     read_recent: true
+
+# Storage configuration
+storage:
+  tsdb:
+    # Data retention period
+    retention.time: 15d
+    
+    # Maximum storage size
+    retention.size: 50GB
+    
+    # Path to storage directory
+    path: /var/lib/prometheus/data
+
+# Web configuration
+# Uncomment to enable authentication and TLS
+# web:
+#   # Basic authentication
+#   basic_auth_users:
+#     admin: $2y$10$... # bcrypt hash of password
+#   
+#   # TLS configuration
+#   tls_server_config:
+#     cert_file: /etc/prometheus/tls/cert.pem
+#     key_file: /etc/prometheus/tls/key.pem

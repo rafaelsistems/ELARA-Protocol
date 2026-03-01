@@ -9,11 +9,13 @@
 //! - State engine fuzzing
 //! - End-to-end integration testing
 //! - Comprehensive chaos harness (5 categories)
+//! - Security testing infrastructure (replay, authentication, key isolation, timing)
 
 pub mod chaos;
 pub mod chaos_harness;
 pub mod integration;
 pub mod network_test;
+pub mod security;
 pub mod simulator;
 pub mod state_fuzzer;
 pub mod time_simulator;
@@ -25,6 +27,7 @@ pub use integration::{
     test_degradation_ladder, test_presence_floor, IntegrationTestConfig, IntegrationTestHarness,
     IntegrationTestResult, SimulatedMessage,
 };
+pub use security::*;
 pub use simulator::*;
 pub use state_fuzzer::*;
 pub use time_simulator::*;

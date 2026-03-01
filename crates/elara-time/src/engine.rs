@@ -211,6 +211,21 @@ impl TimeEngine {
     pub fn state_clock_mut(&mut self) -> &mut StateClock {
         &mut self.state
     }
+
+    /// Get the current time drift in milliseconds.
+    ///
+    /// This returns the drift between the local state clock and the
+    /// network consensus time. A positive value means the local clock
+    /// is ahead, negative means it's behind.
+    ///
+    /// For now, this returns 0 as a placeholder. In a full implementation,
+    /// this would track the difference between local τs and the network
+    /// consensus time based on peer synchronization.
+    pub fn drift_ms(&self) -> i64 {
+        // TODO: Implement actual drift calculation based on peer sync
+        // This would compare self.state.now() with network consensus time
+        0
+    }
 }
 
 impl Default for TimeEngine {

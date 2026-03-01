@@ -112,15 +112,39 @@ impl ReplayManager {
             .or_insert_with(|| ReplayWindow::new(class.replay_window_size()));
 
         if window.accept(seq) {
+            tracing::debug!(
+                node_id = node.0,
+                class = ?class,
+                seq = seq,
+                "Packet accepted by replay protection"
+            );
             Ok(())
         } else {
+            tracing::warn!(
+                node_id = node.0,
+                class = ?class,
+                seq = seq,
+                min_seq = window.min_seq(),
+                "Replay detected"
+            );
             Err(ElaraError::ReplayDetected(seq as u32))
         }
     }
 
     /// Remove windows for a node (on disconnect)
     pub fn remove_node(&mut self, node: NodeId) {
+        let count_before = self.windows.len();
         self.windows.retain(|(n, _), _| *n != node);
+        let count_after = self.windows.len();
+        let removed = count_before - count_after;
+        
+        if removed > 0 {
+            tracing::debug!(
+                node_id = node.0,
+                windows_removed = removed,
+                "Removed replay windows for node"
+            );
+        }
     }
 
     /// Get window for inspection

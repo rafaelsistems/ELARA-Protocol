@@ -20,3 +20,7 @@ pub use identity::*;
 pub use ratchet::*;
 pub use replay::*;
 pub use secure_frame::*;
+
+// Re-export dependencies for fuzzing and external use
+pub use elara_core;
+pub use elara_wire;

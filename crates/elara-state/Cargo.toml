@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors = ["ELARA Protocol Contributors"]
-repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+repository.workspace = true
 homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-state"
 readme = "README.md"
@@ -14,10 +14,11 @@ categories = ["algorithms", "data-structures"]
 rust-version = "1.75"
 
 [dependencies]
-elara-core = "0.1.0"
-elara-time = "0.1.0"
+elara-core = { version = "0.2.0", path = "../elara-core" }
+elara-time = { version = "0.2.0", path = "../elara-time" }
 thiserror = { workspace = true }
 parking_lot = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }

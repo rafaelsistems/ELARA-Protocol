@@ -1,0 +1,314 @@
+# Example Alertmanager Configuration for ELARA Protocol
+#
+# This is a comprehensive example showing how to configure Alertmanager
+# for various notification channels and routing strategies.
+#
+# Copy this file to alertmanager.yml and customize for your environment.
+
+global:
+  # How long to wait before sending a notification about new alerts
+  resolve_timeout: 5m
+  
+  # Slack webhook URL (configure in Slack app settings)
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+  
+  # PagerDuty integration key (configure in PagerDuty)
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  
+  # SMTP settings for email notifications
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alertmanager@example.com'
+  smtp_auth_username: 'alertmanager@example.com'
+  smtp_auth_password: 'your-smtp-password'
+  smtp_require_tls: true
+
+# Templates for notification formatting
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Alert routing configuration
+route:
+  # Default receiver for alerts that don't match any route
+  receiver: 'default'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'node_id']
+  
+  # How long to wait before sending the first notification for a group
+  group_wait: 10s
+  
+  # How long to wait before sending notifications about new alerts in a group
+  group_interval: 10s
+  
+  # How long to wait before re-sending a notification
+  repeat_interval: 12h
+  
+  # Child routes for specific alert types
+  routes:
+    # Critical alerts - page on-call and send to critical Slack channel
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 4h
+      continue: true  # Continue to next matching route
+    
+    - match:
+        severity: critical
+      receiver: 'slack-critical'
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 4h
+    
+    # Security alerts - page security team and send to security channel
+    - match:
+        component: security
+      receiver: 'pagerduty-security'
+      group_wait: 5s
+      group_interval: 5m
+      repeat_interval: 2h
+      continue: true
+    
+    - match:
+        component: security
+      receiver: 'slack-security'
+      group_wait: 5s
+      group_interval: 5m
+      repeat_interval: 2h
+    
+    # Warning alerts - send to warnings Slack channel only
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      group_wait: 30s
+      group_interval: 10m
+      repeat_interval: 24h
+    
+    # Node health alerts - send to ops channel
+    - match:
+        component: health_check
+      receiver: 'slack-ops'
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 12h
+
+# Notification receivers
+receivers:
+  # Default receiver - sends to general alerts channel
+  - name: 'default'
+    slack_configs:
+      - channel: '#elara-alerts'
+        title: 'ELARA Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Severity:* {{ .Labels.severity }}
+          *Node:* {{ .Labels.node_id }}
+          *Summary:* {{ .Annotations.summary }}
+          {{ end }}
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+        send_resolved: true
+
+  # PagerDuty for critical alerts
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+          node_id: '{{ .GroupLabels.node_id }}'
+          severity: '{{ .GroupLabels.severity }}'
+          description: '{{ .CommonAnnotations.description }}'
+          runbook_url: '{{ .CommonAnnotations.runbook_url }}'
+
+  # PagerDuty for security alerts
+  - name: 'pagerduty-security'
+    pagerduty_configs:
+      - service_key: 'YOUR_PAGERDUTY_SECURITY_SERVICE_KEY'
+        description: 'SECURITY: {{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        severity: 'critical'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          node_id: '{{ .GroupLabels.node_id }}'
+          description: '{{ .CommonAnnotations.description }}'
+
+  # Slack for critical alerts
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#elara-critical'
+        username: 'ELARA Alertmanager'
+        icon_emoji: ':rotating_light:'
+        title: ':rotating_light: CRITICAL ALERT :rotating_light:'
+        title_link: 'http://alertmanager:9093'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Node:* {{ .Labels.node_id }}
+          *Component:* {{ .Labels.component }}
+          
+          *Summary:* {{ .Annotations.summary }}
+          
+          *Description:*
+          {{ .Annotations.description }}
+          
+          *Runbook:* {{ .Annotations.runbook_url }}
+          
+          *Status:* {{ .Status }}
+          {{ if eq .Status "firing" }}*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}{{ end }}
+          {{ if eq .Status "resolved" }}*Resolved:* {{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ end }}
+          {{ end }}
+        color: 'danger'
+        send_resolved: true
+
+  # Slack for security alerts
+  - name: 'slack-security'
+    slack_configs:
+      - channel: '#elara-security'
+        username: 'ELARA Security'
+        icon_emoji: ':shield:'
+        title: ':shield: SECURITY ALERT :shield:'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Node:* {{ .Labels.node_id }}
+          *Severity:* {{ .Labels.severity }}
+          
+          *Summary:* {{ .Annotations.summary }}
+          
+          *Description:*
+          {{ .Annotations.description }}
+          
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        color: 'danger'
+        send_resolved: true
+
+  # Slack for warning alerts
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#elara-warnings'
+        username: 'ELARA Alertmanager'
+        icon_emoji: ':warning:'
+        title: ':warning: Warning Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Node:* {{ .Labels.node_id }}
+          *Component:* {{ .Labels.component }}
+          
+          *Summary:* {{ .Annotations.summary }}
+          
+          {{ .Annotations.description }}
+          {{ end }}
+        color: 'warning'
+        send_resolved: true
+
+  # Slack for ops alerts
+  - name: 'slack-ops'
+    slack_configs:
+      - channel: '#elara-ops'
+        username: 'ELARA Alertmanager'
+        icon_emoji: ':gear:'
+        title: 'Operational Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Node:* {{ .Labels.node_id }}
+          *Summary:* {{ .Annotations.summary }}
+          {{ end }}
+        send_resolved: true
+
+  # Email notifications
+  - name: 'email-ops'
+    email_configs:
+      - to: 'ops-team@example.com'
+        from: 'alertmanager@example.com'
+        smarthost: 'smtp.example.com:587'
+        auth_username: 'alertmanager@example.com'
+        auth_password: 'your-smtp-password'
+        require_tls: true
+        headers:
+          Subject: 'ELARA Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>ELARA Protocol Alert</h2>
+          {{ range .Alerts }}
+          <h3>{{ .Labels.alertname }}</h3>
+          <p><strong>Severity:</strong> {{ .Labels.severity }}</p>
+          <p><strong>Node:</strong> {{ .Labels.node_id }}</p>
+          <p><strong>Component:</strong> {{ .Labels.component }}</p>
+          <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
+          <p><strong>Description:</strong></p>
+          <pre>{{ .Annotations.description }}</pre>
+          <p><strong>Runbook:</strong> <a href="{{ .Annotations.runbook_url }}">{{ .Annotations.runbook_url }}</a></p>
+          {{ end }}
+
+  # Webhook for custom integrations
+  - name: 'webhook-custom'
+    webhook_configs:
+      - url: 'http://your-webhook-endpoint/alerts'
+        send_resolved: true
+        http_config:
+          basic_auth:
+            username: 'webhook-user'
+            password: 'webhook-password'
+
+# Inhibition rules to reduce alert noise
+inhibit_rules:
+  # If a node is unhealthy, suppress all other alerts from that node
+  # This prevents alert storms when a node is down
+  - source_match:
+      alertname: 'NodeUnhealthy'
+    target_match_re:
+      alertname: '.*'
+    equal: ['node_id']
+  
+  # If critical memory alert is firing, suppress warning memory alert
+  - source_match:
+      alertname: 'CriticalMemoryUsage'
+    target_match:
+      alertname: 'HighMemoryUsage'
+    equal: ['node_id']
+  
+  # If severe time drift is firing, suppress regular time drift alert
+  - source_match:
+      alertname: 'SevereTimeDrift'
+    target_match:
+      alertname: 'TimeDriftExceeded'
+    equal: ['node_id']
+  
+  # If message processing is stalled, suppress high latency and drop rate alerts
+  - source_match:
+      alertname: 'MessageProcessingStalled'
+    target_match_re:
+      alertname: 'HighLatency|HighMessageDropRate'
+    equal: ['node_id']
+  
+  # If replay attack is detected, suppress high auth failure rate
+  # (replay attacks will cause auth failures)
+  - source_match:
+      alertname: 'ReplayAttackDetected'
+    target_match:
+      alertname: 'HighAuthenticationFailureRate'
+    equal: ['node_id']
+
+# Time-based muting (optional)
+# Uncomment to enable maintenance windows
+# mute_time_intervals:
+#   - name: 'maintenance-window'
+#     time_intervals:
+#       - times:
+#           - start_time: '02:00'
+#             end_time: '04:00'
+#         weekdays: ['saturday', 'sunday']
+#         months: ['january:december']
+
+# Apply muting to specific routes
+# route:
+#   routes:
+#     - match:
+#         severity: warning
+#       receiver: 'slack-warnings'
+#       mute_time_intervals:
+#         - 'maintenance-window'

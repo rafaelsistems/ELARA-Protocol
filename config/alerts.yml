@@ -1,0 +1,415 @@
+# Prometheus Alerting Rules for ELARA Protocol
+# 
+# This file defines production-grade alerting rules for monitoring ELARA Protocol nodes.
+# These rules are designed to detect operational issues before they impact service availability.
+#
+# Integration:
+#   - Load this file into Prometheus using the `rule_files` configuration
+#   - Configure Alertmanager for alert routing and notification
+#   - See docs/operations/MONITORING.md for detailed setup instructions
+#
+# Alert Severity Levels:
+#   - critical: Immediate action required, service degradation or outage
+#   - warning: Investigation needed, potential issues or approaching thresholds
+#
+# For alert response procedures, see docs/operations/RUNBOOK.md
+
+groups:
+  - name: elara_node_health
+    interval: 30s
+    rules:
+      # Critical: Node health check is failing
+      # This indicates the node is unable to serve traffic and should be removed from load balancing
+      - alert: NodeUnhealthy
+        expr: elara_health_status != 1
+        for: 2m
+        labels:
+          severity: critical
+          component: health_check
+        annotations:
+          summary: "ELARA node {{ $labels.node_id }} is unhealthy"
+          description: |
+            Node {{ $labels.node_id }} has been reporting unhealthy status for 2 minutes.
+            Current health status: {{ $value }}
+            
+            Immediate Actions:
+            1. Check node logs for error messages
+            2. Verify network connectivity to peers
+            3. Check resource utilization (memory, CPU)
+            4. Review health check endpoint: http://{{ $labels.instance }}/health
+            
+            If the issue persists, consider restarting the node or removing it from the cluster.
+          runbook_url: "https://docs.elara-protocol.io/runbook#node-unhealthy"
+
+  - name: elara_message_processing
+    interval: 30s
+    rules:
+      # Warning: High message drop rate indicates network issues or resource exhaustion
+      - alert: HighMessageDropRate
+        expr: rate(elara_messages_dropped_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          component: message_processing
+        annotations:
+          summary: "High message drop rate on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} is dropping {{ $value | humanizePercentage }} of messages.
+            This may indicate:
+            - Network congestion or packet loss
+            - Insufficient buffer capacity
+            - Resource exhaustion (CPU, memory)
+            - Peer connectivity issues
+            
+            Investigation Steps:
+            1. Check network metrics for packet loss
+            2. Review CPU and memory utilization
+            3. Verify peer connection health
+            4. Check for error logs related to message processing
+            5. Review message queue depths
+            
+            Threshold: >1% drop rate for 5 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#high-message-drop-rate"
+      
+      # Warning: High message latency impacts user experience
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(elara_message_latency_ms_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: message_processing
+        annotations:
+          summary: "High message latency on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} is experiencing high message latency.
+            P95 latency: {{ $value | humanizeDuration }}
+            
+            This may indicate:
+            - Network congestion or high RTT to peers
+            - CPU saturation or scheduling delays
+            - Disk I/O bottlenecks (if persistence is enabled)
+            - Large message queue backlog
+            
+            Investigation Steps:
+            1. Check network latency to peer nodes
+            2. Review CPU utilization and load average
+            3. Check for disk I/O wait times
+            4. Review message processing queue depths
+            5. Verify no GC pauses or memory pressure
+            6. Check for slow peer nodes in the cluster
+            
+            Threshold: P95 latency >1000ms for 5 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#high-latency"
+      
+      # Critical: Message processing has completely stalled
+      - alert: MessageProcessingStalled
+        expr: rate(elara_messages_received_total[5m]) == 0 and rate(elara_messages_sent_total[5m]) == 0
+        for: 3m
+        labels:
+          severity: critical
+          component: message_processing
+        annotations:
+          summary: "Message processing stalled on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} has not sent or received any messages for 3 minutes.
+            This indicates a complete processing stall.
+            
+            Immediate Actions:
+            1. Check if the node process is running
+            2. Verify network connectivity
+            3. Check for deadlocks in logs
+            4. Review CPU and memory utilization
+            5. Consider restarting the node
+          runbook_url: "https://docs.elara-protocol.io/runbook#message-processing-stalled"
+
+  - name: elara_resource_utilization
+    interval: 30s
+    rules:
+      # Warning: High memory usage may lead to OOM kills
+      - alert: HighMemoryUsage
+        expr: elara_memory_usage_bytes > 1.8e9
+        for: 5m
+        labels:
+          severity: warning
+          component: resource_management
+        annotations:
+          summary: "High memory usage on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} is using {{ $value | humanize1024 }}B of memory.
+            Memory limit: 2GB
+            Usage: {{ $value | humanize1024 }}B ({{ $value | humanizePercentage }} of limit)
+            
+            This may indicate:
+            - Memory leak in the application
+            - Excessive message buffering
+            - Large state size requiring optimization
+            - Insufficient memory allocation for workload
+            
+            Investigation Steps:
+            1. Review memory usage trends over time
+            2. Check for memory leaks in application logs
+            3. Analyze heap dumps if available
+            4. Review message queue sizes and buffer usage
+            5. Check state size and consider compaction
+            6. Verify no memory-intensive operations running
+            
+            If memory usage continues to grow, consider:
+            - Increasing memory limits
+            - Optimizing state storage
+            - Implementing message backpressure
+            - Restarting the node during a maintenance window
+            
+            Threshold: >1.8GB (90% of 2GB limit) for 5 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#high-memory-usage"
+      
+      # Critical: Memory usage is critically high, OOM imminent
+      - alert: CriticalMemoryUsage
+        expr: elara_memory_usage_bytes > 1.95e9
+        for: 2m
+        labels:
+          severity: critical
+          component: resource_management
+        annotations:
+          summary: "CRITICAL: Memory usage on ELARA node {{ $labels.node_id }} is near limit"
+          description: |
+            Node {{ $labels.node_id }} is using {{ $value | humanize1024 }}B of memory (>97.5% of 2GB limit).
+            OOM kill is imminent!
+            
+            Immediate Actions:
+            1. Prepare for node restart
+            2. Drain traffic if possible
+            3. Capture heap dump for analysis
+            4. Restart node to prevent OOM kill
+          runbook_url: "https://docs.elara-protocol.io/runbook#critical-memory-usage"
+      
+      # Warning: High CPU usage may impact performance
+      - alert: HighCPUUsage
+        expr: elara_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: resource_management
+        annotations:
+          summary: "High CPU usage on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} is using {{ $value }}% CPU for 10 minutes.
+            
+            This may indicate:
+            - High message processing load
+            - Inefficient algorithms or hot loops
+            - Cryptographic operation overhead
+            - Insufficient CPU allocation
+            
+            Investigation Steps:
+            1. Review CPU usage trends and correlate with message rate
+            2. Check for CPU-intensive operations in logs
+            3. Profile the application to identify hot paths
+            4. Verify message processing efficiency
+            5. Check for excessive cryptographic operations
+            
+            Threshold: >80% CPU for 10 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#high-cpu-usage"
+
+  - name: elara_protocol_health
+    interval: 30s
+    rules:
+      # Warning: Time drift may cause message ordering issues
+      - alert: TimeDriftExceeded
+        expr: abs(elara_time_drift_ms) > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: time_engine
+        annotations:
+          summary: "Time drift exceeded on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} has a time drift of {{ $value }}ms from the cluster.
+            
+            Time drift can cause:
+            - Message ordering issues
+            - State synchronization problems
+            - Incorrect causality detection
+            - Session establishment failures
+            
+            Investigation Steps:
+            1. Check NTP synchronization status
+            2. Verify system clock accuracy
+            3. Review time drift trends over time
+            4. Check for clock skew with peer nodes
+            5. Verify NTP server connectivity
+            
+            Remediation:
+            1. Ensure NTP daemon is running and synchronized
+            2. Configure reliable NTP servers
+            3. Check for hardware clock issues
+            4. Consider using PTP for higher accuracy
+            
+            Threshold: >100ms drift for 5 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#time-drift-exceeded"
+      
+      # Critical: Severe time drift will break protocol guarantees
+      - alert: SevereTimeDrift
+        expr: abs(elara_time_drift_ms) > 500
+        for: 2m
+        labels:
+          severity: critical
+          component: time_engine
+        annotations:
+          summary: "CRITICAL: Severe time drift on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} has a severe time drift of {{ $value }}ms.
+            This will break protocol guarantees!
+            
+            Immediate Actions:
+            1. Check NTP synchronization immediately
+            2. Verify system clock is not drifting
+            3. Consider removing node from cluster until time is synchronized
+            4. Force NTP sync if necessary
+          runbook_url: "https://docs.elara-protocol.io/runbook#severe-time-drift"
+      
+      # Warning: State divergence indicates synchronization issues
+      - alert: StateDivergence
+        expr: elara_state_divergence > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: state_reconciliation
+        annotations:
+          summary: "State divergence detected on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} has a state divergence of {{ $value }} events.
+            
+            This may indicate:
+            - Network partition or connectivity issues
+            - Slow state synchronization
+            - High message loss rate
+            - Peer node failures
+            
+            Investigation Steps:
+            1. Check network connectivity to peer nodes
+            2. Review state synchronization logs
+            3. Verify peer node health
+            4. Check for message drop rates
+            5. Review state reconciliation performance
+            
+            Threshold: >10 divergent events for 5 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#state-divergence"
+
+  - name: elara_connection_health
+    interval: 30s
+    rules:
+      # Warning: Low connection count may indicate network issues
+      - alert: LowConnectionCount
+        expr: elara_active_connections < 2
+        for: 5m
+        labels:
+          severity: warning
+          component: connection_management
+        annotations:
+          summary: "Low connection count on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} has only {{ $value }} active connections.
+            
+            This may indicate:
+            - Network connectivity issues
+            - Peer node failures
+            - Configuration issues
+            - Firewall or routing problems
+            
+            Investigation Steps:
+            1. Check network connectivity to peer nodes
+            2. Verify peer node health and availability
+            3. Review connection establishment logs
+            4. Check firewall rules and network policies
+            5. Verify DNS resolution for peer addresses
+            
+            Threshold: <2 active connections for 5 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#low-connection-count"
+      
+      # Warning: High connection failure rate
+      - alert: HighConnectionFailureRate
+        expr: rate(elara_failed_connections_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: connection_management
+        annotations:
+          summary: "High connection failure rate on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} is experiencing {{ $value }} connection failures per second.
+            
+            This may indicate:
+            - Network instability
+            - Peer node overload or failures
+            - Authentication issues
+            - TLS/certificate problems
+            
+            Investigation Steps:
+            1. Review connection error logs
+            2. Check network stability and packet loss
+            3. Verify peer node capacity and health
+            4. Check authentication credentials
+            5. Verify TLS certificates are valid
+            
+            Threshold: >0.1 failures/sec for 5 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#high-connection-failure-rate"
+
+  - name: elara_security
+    interval: 30s
+    rules:
+      # Critical: Replay attacks detected
+      - alert: ReplayAttackDetected
+        expr: rate(elara_replay_attacks_detected_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Replay attack detected on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} has detected {{ $value }} replay attacks per second.
+            
+            This indicates:
+            - Active security threat
+            - Potential malicious peer
+            - Network tampering or MITM attack
+            
+            Immediate Actions:
+            1. Identify the source peer from logs
+            2. Block the malicious peer immediately
+            3. Review security logs for attack patterns
+            4. Verify replay window configuration
+            5. Consider rotating session keys
+            6. Alert security team
+            
+            This is a security incident and should be investigated immediately.
+          runbook_url: "https://docs.elara-protocol.io/runbook#replay-attack-detected"
+      
+      # Critical: Authentication failures may indicate attack
+      - alert: HighAuthenticationFailureRate
+        expr: rate(elara_authentication_failures_total[5m]) > 1
+        for: 3m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "High authentication failure rate on ELARA node {{ $labels.node_id }}"
+          description: |
+            Node {{ $labels.node_id }} is experiencing {{ $value }} authentication failures per second.
+            
+            This may indicate:
+            - Brute force attack attempt
+            - Misconfigured peer credentials
+            - Key rotation issues
+            - Potential security breach
+            
+            Immediate Actions:
+            1. Review authentication logs
+            2. Identify source of failed attempts
+            3. Verify peer credentials are correct
+            4. Check for rate limiting effectiveness
+            5. Consider blocking suspicious peers
+            6. Alert security team if attack suspected
+            
+            Threshold: >1 failure/sec for 3 minutes
+          runbook_url: "https://docs.elara-protocol.io/runbook#high-authentication-failure-rate"

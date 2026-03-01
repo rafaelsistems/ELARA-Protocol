@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getting Started - ELARA Protocol</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #667eea;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            margin-top: 30px;
+        }
+        
+        h2:first-child {
+            margin-top: 0;
+        }
+        
+        h3 {
+            color: #555;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            margin-top: 25px;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-left: 5px solid #f39c12;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-left: 5px solid #17a2b8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-left: 5px solid #28a745;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        
+        .navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .nav-btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+        
+        .nav-btn:hover {
+            background: #5a6fd8;
+        }
+        
+        .nav-btn.disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 30px 0;
+            color: #6c757d;
+            border-top: 1px solid #e9ecef;
+            margin-top: 40px;
+        }
+        
+        .toc {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .toc h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .toc li {
+            margin-bottom: 8px;
+        }
+        
+        .toc a {
+            color: #333;
+            text-decoration: none;
+        }
+        
+        .toc a:hover {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Getting Started with ELARA Protocol</h1>
+            <div class="subtitle">Build resilient real-time communication applications</div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="toc">
+            <h3>Table of Contents</h3>
+            <ul>
+                <li><a href="#prerequisites">Prerequisites</a></li>
+                <li><a href="#installation">Installation</a></li>
+                <li><a href="#quick-start">Quick Start</a></li>
+                <li><a href="#core-concepts">Core Concepts</a></li>
+                <li><a href="#examples">Examples</a></li>
+                <li><a href="#next-steps">Next Steps</a></li>
+            </ul>
+        </div>
+        
+        <div class="content">
+            <h2 id="prerequisites">Prerequisites</h2>
+            
+            <ul>
+                <li><strong>Rust 1.75+</strong> - <a href="https://rustup.rs/" target="_blank">Install Rust</a></li>
+                <li><strong>Cargo</strong> - Comes with Rust</li>
+                <li><strong>Git</strong> - For version control</li>
+            </ul>
+            
+            <div class="code-block">
+# Check Rust version
+rustc --version
+
+# Update Rust if needed
+rustup update
+            </div>
+            
+            <h2 id="installation">Installation</h2>
+            
+            <p>Add ELARA crates to your <code>Cargo.toml</code>:</p>
+            
+            <div class="code-block">
+[dependencies]
+elara-core = "0.2.0"
+elara-crypto = "0.2.0"
+elara-time = "0.2.0"
+elara-state = "0.2.0"
+elara-wire = "0.2.0"
+elara-transport = "0.2.0"
+            </div>
+            
+            <p>Or use cargo add:</p>
+            
+            <div class="code-block">
+cargo add elara-core elara-crypto elara-time elara-state elara-wire elara-transport
+            </div>
+            
+            <h2 id="quick-start">Quick Start</h2>
+            
+            <p>Here's a minimal example to get you started:</p>
+            
+            <div class="code-block">
+use elara_core::{NodeId, Event, EventType};
+use elara_crypto::Identity;
+use elara_time::TimeEngine;
+use elara_state::StateField;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Generate a cryptographic identity
+    let identity = Identity::generate();
+    let node_id = identity.node_id();
+    
+    println!("ELARA Node ID: {}", node_id);
+    
+    // Create time engine for temporal coordination
+    let mut time_engine = TimeEngine::new(node_id);
+    
+    // Create state field for distributed state
+    let mut state_field = StateField::new(node_id);
+    
+    // Create an event with temporal awareness
+    let event = Event::new(
+        EventType::PresenceUpdate,
+        b"Hello, ELARA!".to_vec(),
+        time_engine.perceptual_time()
+    );
+    
+    println!("Created event at perceptual time: {:?}", event.timestamp());
+    
+    Ok(())
+}
+            </div>
+            
+            <div class="success">
+                <strong>Success!</strong> You've created your first ELARA node with identity, time awareness, and event handling.
+            </div>
+            
+            <h2 id="core-concepts">Core Concepts</h2>
+            
+            <h3>🔐 Identity</h3>
+            <p>Every ELARA node has a cryptographic identity:</p>
+            
+            <div class="code-block">
+use elara_crypto::Identity;
+
+// Generate new identity
+let identity = Identity::generate();
+let node_id = identity.node_id();
+
+// Export for persistence
+let exported = identity.export()?;
+
+// Import from storage
+let identity = Identity::import(&exported)?;
+            </div>
+            
+            <h3>⏱️ Dual Clock System</h3>
+            <p>ELARA uses two time systems:</p>
+            
+            <div class="code-block">
+use elara_time::{TimeEngine, PerceptualClock, StateClock};
+
+let mut engine = TimeEngine::new(node_id);
+
+// Perceptual time: smooth, for UX
+let perceptual = engine.perceptual_time();
+
+// State time: correctable, for consensus
+let state = engine.state_time();
+
+// Update based on network observations
+engine.update_peer_time(peer_id, remote_time, rtt)?;
+            </div>
+            
+            <h3>🔄 State Field</h3>
+            <p>Distributed state as a physical field:</p>
+            
+            <div class="code-block">
+use elara_state::{StateField, StateAtom, Authority};
+use elara_core::StateId;
+
+let mut field = StateField::new(node_id);
+
+// Create state atom
+let atom = StateAtom::new(
+    StateId::generate(),
+    Authority::Open,
+    data,
+    version_vector
+);
+
+// Apply to local field
+field.apply_atom(atom)?;
+            </div>
+            
+            <h3>📡 Wire Protocol</h3>
+            <p>Binary encoding with packet classes:</p>
+            
+            <div class="code-block">
+use elara_wire::{Frame, FrameBuilder, PacketClass};
+use elara_crypto::SecureFrameProcessor;
+
+let frame = FrameBuilder::new()
+    .with_class(PacketClass::Perceptual)
+    .with_payload(data)
+    .build()?;
+
+// Encrypt for transport
+let secure_frame = crypto.encrypt(frame, session_key)?;
+            </div>
+            
+            <h2 id="examples">Examples</h2>
+            
+            <h3>Simple Chat Application</h3>
+            
+            <div class="code-block">
+use elara_core::{Event, EventType, MessageId};
+use elara_state::StateField;
+
+// Create text message event
+let message_event = Event::new(
+    EventType::TextMessage,
+    b"Hello from ELARA!".to_vec(),
+    time_engine.perceptual_time()
+);
+
+// Store in state field
+let message_atom = StateAtom::from_event(message_event, Authority::Open);
+state_field.apply_atom(message_atom)?;
+            </div>
+            
+            <h3>Network Time Synchronization</h3>
+            
+            <div class="code-block">
+use elara_time::{NetworkQuality, HorizonConfig};
+
+// Configure horizons based on network quality
+let quality = NetworkQuality::from_rtt_stats(rtt_samples);
+let config = HorizonConfig::from_quality(quality);
+
+time_engine.set_horizons(config);
+
+// Time now adapts to network conditions
+let adaptive_time = time_engine.adaptive_time();
+            </div>
+            
+            <h3>State Reconciliation</h3>
+            
+            <div class="code-block">
+use elara_state::ReconciliationEngine;
+
+let mut reconciler = ReconciliationEngine::new();
+
+// Merge remote state
+let result = reconciler.reconcile(&local_field, &remote_field)?;
+
+// Check convergence
+if result.is_converged() {
+    println!("State converged!");
+} else {
+    println!("Divergence detected: {:?}", result.divergence());
+}
+            </div>
+            
+            <h2 id="next-steps">Next Steps</h2>
+            
+            <h3>📚 Learn More</h3>
+            <ul>
+                <li><a href="https://github.com/rafaelsistems/ELARA-Protocol/blob/main/docs/HARD_INVARIANTS.md" target="_blank">Hard Invariants</a> - Core system laws</li>
+                <li><a href="https://github.com/rafaelsistems/ELARA-Protocol/blob/main/docs/architecture/four-pillars.md" target="_blank">Four Pillars</a> - Architecture overview</li>
+                <li><a href="https://github.com/rafaelsistems/ELARA-Protocol/tree/main/examples" target="_blank">Examples</a> - Complete applications</li>
+            </ul>
+            
+            <h3>🛠️ Build Something</h3>
+            <p>Try building:</p>
+            <ul>
+                <li>Real-time chat application</li>
+                <li>Multiplayer game state sync</li>
+                <li>IoT sensor network</li>
+                <li>Collaborative editing tool</li>
+            </ul>
+            
+            <h3>🤝 Get Help</h3>
+            <ul>
+                <li><a href="https://github.com/rafaelsistems/ELARA-Protocol/issues" target="_blank">GitHub Issues</a> - Bug reports and feature requests</li>
+                <li><a href="https://github.com/rafaelsistems/ELARA-Protocol/discussions" target="_blank">GitHub Discussions</a> - Community support</li>
+                <li><a href="https://docs.rs/elara-core" target="_blank">API Documentation</a> - Technical reference</li>
+            </ul>
+            
+            <div class="info">
+                <strong>Pro Tip:</strong> Start with <code>elara-core</code> and gradually add other crates as needed. The protocol is designed to be modular!
+            </div>
+        </div>
+        
+        <div class="navigation">
+            <a href="#" class="nav-btn disabled">← Previous</a>
+            <a href="#" class="nav-btn">Next: API Reference →</a>
+        </div>
+        
+        <footer>
+            <p>ELARA Protocol - Network affects the SHAPE of reality, not its CONTINUITY.</p>
+            <p><a href="https://github.com/rafaelsistems/ELARA-Protocol" target="_blank">GitHub</a> | 
+               <a href="https://crates.io/search?q=elara" target="_blank">crates.io</a> | 
+               <a href="https://docs.rs/elara-core" target="_blank">Documentation</a></p>
+        </footer>
+    </div>
+</body>
+</html>

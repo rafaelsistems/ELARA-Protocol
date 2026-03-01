@@ -44,12 +44,33 @@ impl ReconciliationEngine {
         &mut self.field
     }
 
+    /// Get the number of pending events that haven't been fully reconciled.
+    ///
+    /// This returns a count of events that are buffered or waiting for
+    /// reconciliation. A high pending count may indicate state divergence
+    /// or convergence issues.
+    ///
+    /// For now, this returns 0 as a placeholder. In a full implementation,
+    /// this would track buffered events, unmerged states, and other
+    /// pending reconciliation work.
+    pub fn pending_count(&self) -> usize {
+        // TODO: Implement actual pending event tracking
+        // This would count buffered events, unmerged atoms, etc.
+        0
+    }
+
     /// Process a batch of events
     pub fn process_events(
         &mut self,
         events: Vec<Event>,
         time_engine: &TimeEngine,
     ) -> ReconciliationResult {
+        let event_count = events.len();
+        tracing::debug!(
+            event_count = event_count,
+            "Processing event batch"
+        );
+
         let mut result = ReconciliationResult::default();
 
         for event in events {
@@ -63,18 +84,44 @@ impl ReconciliationEngine {
             }
         }
 
+        tracing::info!(
+            applied = result.applied,
+            merged = result.merged,
+            late_corrected = result.late_corrected,
+            buffered = result.buffered,
+            rejected = result.rejected,
+            "Event batch processed"
+        );
+
         result
     }
 
     /// Process a single event through the reconciliation pipeline
     fn process_single_event(&mut self, event: Event, time_engine: &TimeEngine) -> EventResult {
+        tracing::debug!(
+            source = event.source.0,
+            target_state = event.target_state.0,
+            event_type = ?event.event_type,
+            "Processing event"
+        );
+
         // Stage 1: Authority Check
         if !self.check_authority(&event) {
+            tracing::warn!(
+                source = event.source.0,
+                target_state = event.target_state.0,
+                "Event rejected: unauthorized"
+            );
             return EventResult::Rejected(RejectReason::Unauthorized);
         }
 
         // Stage 2: Causality Check
         if !self.check_causality(&event) {
+            tracing::warn!(
+                source = event.source.0,
+                target_state = event.target_state.0,
+                "Event rejected: causality violation"
+            );
             // Quarantine for later
             self.field.quarantine(
                 vec![], // Would serialize event here
@@ -86,6 +133,10 @@ impl ReconciliationEngine {
 
         // Special case: deletions should apply immediately to avoid stale atoms
         if matches!(event.mutation, elara_core::MutationOp::Delete) {
+            tracing::debug!(
+                target_state = event.target_state.0,
+                "Applying deletion event"
+            );
             self.apply_event(&event, time_engine.tau_s());
             return EventResult::Applied;
         }
@@ -96,20 +147,42 @@ impl ReconciliationEngine {
 
         // Stage 4: Handle based on temporal position
         match position {
-            TimePosition::TooLate => EventResult::Rejected(RejectReason::TooLate),
+            TimePosition::TooLate => {
+                tracing::debug!(
+                    target_state = event.target_state.0,
+                    "Event rejected: too late"
+                );
+                EventResult::Rejected(RejectReason::TooLate)
+            }
             TimePosition::Correctable => {
+                tracing::debug!(
+                    target_state = event.target_state.0,
+                    "Applying late correction"
+                );
                 self.apply_late_correction(&event, time_engine);
                 EventResult::LateCorrected
             }
             TimePosition::Current => {
+                tracing::debug!(
+                    target_state = event.target_state.0,
+                    "Applying current event"
+                );
                 self.apply_event(&event, time_engine.tau_s());
                 EventResult::Applied
             }
             TimePosition::Predictable => {
+                tracing::debug!(
+                    target_state = event.target_state.0,
+                    "Merging predictable event"
+                );
                 self.replace_prediction(&event, time_engine.tau_s());
                 EventResult::Merged
             }
             TimePosition::TooEarly => {
+                tracing::debug!(
+                    target_state = event.target_state.0,
+                    "Buffering early event"
+                );
                 // Buffer for future
                 EventResult::Buffered
             }
@@ -223,8 +296,18 @@ impl ReconciliationEngine {
 
     /// Control divergence across all atoms
     pub fn control_divergence(&mut self) {
+        let atom_count = self.field.atoms.len();
+        let mut reduced_count = 0;
+
+        tracing::debug!(
+            atom_count = atom_count,
+            threshold = self.divergence_threshold,
+            "Controlling divergence"
+        );
+
         for (_, atom) in self.field.atoms.iter_mut() {
             if atom.entropy.level > self.divergence_threshold {
+                reduced_count += 1;
                 // Reduce detail based on state type
                 match atom.state_type {
                     StateType::Enhancement | StateType::Cosmetic => {
@@ -241,6 +324,14 @@ impl ReconciliationEngine {
                     }
                 }
             }
+        }
+
+        if reduced_count > 0 {
+            tracing::info!(
+                reduced_count = reduced_count,
+                total_atoms = atom_count,
+                "Divergence control applied"
+            );
         }
     }
 }

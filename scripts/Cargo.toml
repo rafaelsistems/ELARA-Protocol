@@ -1,0 +1,18 @@
+[package]
+name = "security-audit"
+version = "0.1.0"
+edition = "2021"
+
+# Standalone package - not part of workspace
+[workspace]
+
+[[bin]]
+name = "security-audit"
+path = "security-audit.rs"
+
+[[bin]]
+name = "generate-sbom"
+path = "generate-sbom.rs"
+
+[dependencies]
+# No external dependencies - uses only std library for portability

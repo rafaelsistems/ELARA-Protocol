@@ -1,6 +1,7 @@
 //! ELARA Node - Runtime loop implementation
 
 use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use elara_core::{
@@ -16,7 +17,67 @@ use elara_visual::{
 };
 use elara_wire::{Extensions, FixedHeader, Frame, FrameBuilder, AUTH_TAG_SIZE};
 
+use crate::observability::metrics::NodeMetrics;
+use crate::observability::ObservabilityConfig;
+
 /// ELARA Node configuration
+///
+/// # Observability
+///
+/// The `observability` field provides unified configuration for all observability
+/// components (logging, tracing, metrics). It is optional and disabled by default.
+///
+/// When enabled, observability components are initialized before the node starts:
+/// - **Logging**: Structured logs with configurable format and output
+/// - **Tracing**: Distributed tracing with OpenTelemetry support
+/// - **Metrics Server**: HTTP server exposing Prometheus metrics
+///
+/// # Example with Observability
+///
+/// ```no_run
+/// use elara_runtime::node::NodeConfig;
+/// use elara_runtime::observability::{
+///     ObservabilityConfig, LoggingConfig, LogLevel, LogFormat, LogOutput,
+///     MetricsServerConfig
+/// };
+/// use std::time::Duration;
+///
+/// let config = NodeConfig {
+///     tick_interval: Duration::from_millis(100),
+///     max_packet_buffer: 1000,
+///     max_outgoing_buffer: 1000,
+///     max_local_events: 1000,
+///     metrics: None,
+///     observability: Some(ObservabilityConfig {
+///         logging: Some(LoggingConfig {
+///             level: LogLevel::Info,
+///             format: LogFormat::Json,
+///             output: LogOutput::Stdout,
+///         }),
+///         tracing: None,
+///         metrics_server: Some(MetricsServerConfig {
+///             bind_address: "0.0.0.0".to_string(),
+///             port: 9090,
+///         }),
+///     }),
+/// };
+/// ```
+///
+/// # Example without Observability (Default)
+///
+/// ```no_run
+/// use elara_runtime::node::NodeConfig;
+/// use std::time::Duration;
+///
+/// let config = NodeConfig {
+///     tick_interval: Duration::from_millis(100),
+///     max_packet_buffer: 1000,
+///     max_outgoing_buffer: 1000,
+///     max_local_events: 1000,
+///     metrics: None,
+///     observability: None, // Observability disabled
+/// };
+/// ```
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
     /// Tick interval
@@ -26,6 +87,67 @@ pub struct NodeConfig {
     /// Maximum outgoing packet buffer
     pub max_outgoing_buffer: usize,
     pub max_local_events: usize,
+    /// Optional metrics for monitoring (None = metrics disabled)
+    pub metrics: Option<NodeMetrics>,
+    /// Optional unified observability configuration (None = observability disabled)
+    ///
+    /// When set, this enables structured logging, distributed tracing, and/or
+    /// metrics server based on the provided configuration. All components are
+    /// opt-in - set individual fields to `None` to disable specific components.
+    ///
+    /// **Note**: This is separate from the `metrics` field. The `metrics` field
+    /// provides direct access to metrics for the node runtime, while `observability`
+    /// provides a unified initialization system with HTTP server support.
+    pub observability: Option<ObservabilityConfig>,
+    /// Optional health check configuration (None = health checks disabled)
+    ///
+    /// When set, this enables the health check system with built-in checks for:
+    /// - Connection health (minimum active connections)
+    /// - Memory usage (maximum memory threshold)
+    /// - Time drift (maximum drift from network consensus)
+    /// - State divergence (maximum pending events)
+    ///
+    /// Health checks are opt-in and disabled by default. When enabled, you can
+    /// configure thresholds for each check and optionally expose HTTP endpoints
+    /// for Kubernetes probes and load balancers.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use elara_runtime::node::NodeConfig;
+    /// use elara_runtime::health::HealthCheckConfig;
+    /// use std::time::Duration;
+    ///
+    /// let config = NodeConfig {
+    ///     health_checks: Some(HealthCheckConfig::medium_deployment()),
+    ///     ..Default::default()
+    /// };
+    /// ```
+    ///
+    /// # Production Deployment
+    ///
+    /// Use the preset configurations for common deployment sizes:
+    /// - `HealthCheckConfig::small_deployment()` - 10 nodes
+    /// - `HealthCheckConfig::medium_deployment()` - 100 nodes
+    /// - `HealthCheckConfig::large_deployment()` - 1000 nodes
+    ///
+    /// Or customize thresholds based on your specific requirements:
+    ///
+    /// ```rust,no_run
+    /// use elara_runtime::health::HealthCheckConfig;
+    /// use std::time::Duration;
+    ///
+    /// let health_config = HealthCheckConfig {
+    ///     enabled: true,
+    ///     server_bind_address: Some("0.0.0.0:8080".parse().unwrap()),
+    ///     cache_ttl: Duration::from_secs(30),
+    ///     min_connections: Some(5),
+    ///     max_memory_mb: Some(2000),
+    ///     max_time_drift_ms: Some(100),
+    ///     max_pending_events: Some(1000),
+    /// };
+    /// ```
+    pub health_checks: Option<crate::health::HealthCheckConfig>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -136,7 +258,148 @@ impl Default for NodeConfig {
             max_packet_buffer: 1000,
             max_outgoing_buffer: 1000,
             max_local_events: 1000,
+            metrics: None,
+            observability: None, // Observability disabled by default
+            health_checks: None, // Health checks disabled by default
         }
+    }
+}
+
+impl NodeConfig {
+    /// Initializes health checks based on the configuration.
+    ///
+    /// This method creates a `HealthChecker` with the configured checks and
+    /// optionally starts an HTTP server to expose health endpoints.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - Arc reference to the Node for health checks that need node access
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some((checker, server_handle))` if health checks are enabled, where:
+    /// - `checker` is the configured `HealthChecker`
+    /// - `server_handle` is `Some(JoinHandle)` if HTTP server is started, `None` otherwise
+    ///
+    /// Returns `None` if health checks are disabled.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use elara_runtime::node::{Node, NodeConfig};
+    /// use elara_runtime::health::HealthCheckConfig;
+    /// use std::sync::Arc;
+    ///
+    /// let config = NodeConfig {
+    ///     health_checks: Some(HealthCheckConfig::medium_deployment()),
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let node = Arc::new(Node::with_config(config.clone()));
+    ///
+    /// if let Some((checker, server_handle)) = config.init_health_checks(node) {
+    ///     println!("Health checks initialized");
+    ///     
+    ///     // Check health programmatically
+    ///     let status = checker.check_health();
+    ///     println!("Health status: {:?}", status.overall);
+    ///     
+    ///     // Server is running in background (if configured)
+    ///     if let Some(handle) = server_handle {
+    ///         // Server will run until handle is dropped or joined
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # HTTP Endpoints
+    ///
+    /// When `server_bind_address` is configured, the following endpoints are exposed:
+    ///
+    /// - `GET /health` - Overall health status
+    ///   - Returns 200 OK if healthy or degraded
+    ///   - Returns 503 Service Unavailable if unhealthy
+    ///
+    /// - `GET /ready` - Readiness probe (Kubernetes)
+    ///   - Returns 200 OK if healthy or degraded
+    ///   - Returns 503 Service Unavailable if unhealthy
+    ///
+    /// - `GET /live` - Liveness probe (Kubernetes)
+    ///   - Returns 200 OK if healthy or degraded
+    ///   - Returns 503 Service Unavailable if unhealthy
+    ///
+    /// # Panics
+    ///
+    /// Panics if the health check configuration is invalid (fails validation).
+    pub fn init_health_checks(
+        &self,
+        node: Arc<Node>,
+    ) -> Option<(
+        Arc<crate::health::HealthChecker>,
+        Option<tokio::task::JoinHandle<Result<(), std::io::Error>>>,
+    )> {
+        use crate::health::{
+            ConnectionHealthCheck, HealthChecker, MemoryHealthCheck, StateDivergenceCheck,
+            TimeDriftCheck,
+        };
+        use crate::health_server::{HealthServer, HealthServerConfig};
+
+        // Return None if health checks are disabled
+        let health_config = self.health_checks.as_ref()?;
+
+        // Validate configuration
+        health_config
+            .validate()
+            .expect("Invalid health check configuration");
+
+        // Return None if explicitly disabled
+        if !health_config.enabled {
+            return None;
+        }
+
+        // Create health checker with configured cache TTL
+        let mut checker = HealthChecker::new(health_config.cache_ttl);
+
+        // Add built-in health checks based on configuration
+        if let Some(min_connections) = health_config.min_connections {
+            checker.add_check(Box::new(ConnectionHealthCheck::new(
+                node.clone(),
+                min_connections,
+            )));
+        }
+
+        if let Some(max_memory_mb) = health_config.max_memory_mb {
+            checker.add_check(Box::new(MemoryHealthCheck::new(max_memory_mb)));
+        }
+
+        if let Some(max_drift_ms) = health_config.max_time_drift_ms {
+            checker.add_check(Box::new(TimeDriftCheck::new(node.clone(), max_drift_ms)));
+        }
+
+        if let Some(max_pending_events) = health_config.max_pending_events {
+            checker.add_check(Box::new(StateDivergenceCheck::with_threshold(
+                node.clone(),
+                max_pending_events,
+            )));
+        }
+
+        let checker = Arc::new(checker);
+
+        // Start HTTP server if bind address is configured
+        let server_handle = if let Some(bind_address) = health_config.server_bind_address {
+            let server_config = HealthServerConfig { bind_address };
+            let server = HealthServer::new(checker.clone(), server_config);
+
+            // Spawn server in background task
+            let handle = tokio::spawn(async move {
+                server.serve().await
+            });
+
+            Some(handle)
+        } else {
+            None
+        };
+
+        Some((checker, server_handle))
     }
 }
 
@@ -167,16 +430,24 @@ pub struct Node {
     visual_predictors: HashMap<NodeId, VisualPredictor>,
     stream_visual_buffers: HashMap<u64, VisualStateBuffer>,
     stream_visual_predictors: HashMap<u64, VisualPredictor>,
+    /// Optional metrics (cloned from config for convenience)
+    metrics: Option<NodeMetrics>,
 }
 
 impl Node {
     /// Create a new node with generated identity
     pub fn new() -> Self {
-        Self::with_config(NodeConfig::default())
+        let node = Self::with_config(NodeConfig::default());
+        tracing::info!(
+            node_id = node.node_id().0,
+            "Created new node"
+        );
+        node
     }
 
     /// Create a new node with custom configuration
     pub fn with_config(config: NodeConfig) -> Self {
+        let metrics = config.metrics.clone();
         Node {
             identity: Identity::generate(),
             session_id: None,
@@ -194,10 +465,12 @@ impl Node {
             visual_predictors: HashMap::new(),
             stream_visual_buffers: HashMap::new(),
             stream_visual_predictors: HashMap::new(),
+            metrics,
         }
     }
 
     pub fn with_identity(identity: Identity, config: NodeConfig) -> Self {
+        let metrics = config.metrics.clone();
         Node {
             identity,
             session_id: None,
@@ -215,6 +488,7 @@ impl Node {
             visual_predictors: HashMap::new(),
             stream_visual_buffers: HashMap::new(),
             stream_visual_predictors: HashMap::new(),
+            metrics,
         }
     }
 
@@ -230,21 +504,82 @@ impl Node {
 
     /// Join a session
     pub fn join_session(&mut self, session_id: SessionId, session_key: [u8; 32]) {
+        let span = tracing::span!(
+            tracing::Level::INFO,
+            "join_session",
+            node_id = self.node_id().0,
+            session_id = session_id.0
+        );
+        let _enter = span.enter();
+
+        tracing::info!(
+            node_id = self.node_id().0,
+            session_id = session_id.0,
+            "Joining session"
+        );
+
         self.session_id = Some(session_id);
         self.secure_processor = Some(SecureFrameProcessor::new(
             session_id,
             self.node_id(),
             session_key,
         ));
+
+        // Update metrics: increment active connections and total connections
+        if let Some(ref metrics) = self.metrics {
+            metrics.active_connections.inc();
+            metrics.total_connections.inc();
+        }
     }
 
     pub fn join_session_unsecured(&mut self, session_id: SessionId) {
+        let span = tracing::span!(
+            tracing::Level::INFO,
+            "join_session_unsecured",
+            node_id = self.node_id().0,
+            session_id = session_id.0
+        );
+        let _enter = span.enter();
+
+        tracing::warn!(
+            node_id = self.node_id().0,
+            session_id = session_id.0,
+            "Joining session without encryption (unsecured mode)"
+        );
+
         self.session_id = Some(session_id);
         self.secure_processor = None;
+
+        // Update metrics: increment active connections and total connections
+        if let Some(ref metrics) = self.metrics {
+            metrics.active_connections.inc();
+            metrics.total_connections.inc();
+        }
     }
 
     /// Leave current session
     pub fn leave_session(&mut self) {
+        let span = tracing::span!(
+            tracing::Level::INFO,
+            "leave_session",
+            node_id = self.node_id().0,
+            session_id = ?self.session_id
+        );
+        let _enter = span.enter();
+
+        if let Some(session_id) = self.session_id {
+            tracing::info!(
+                node_id = self.node_id().0,
+                session_id = session_id.0,
+                "Leaving session"
+            );
+
+            // Update metrics: decrement active connections
+            if let Some(ref metrics) = self.metrics {
+                metrics.active_connections.dec();
+            }
+        }
+
         self.session_id = None;
         self.secure_processor = None;
     }
@@ -254,6 +589,18 @@ impl Node {
         if self.incoming.len() < self.config.max_packet_buffer {
             self.incoming.push_back(frame);
             self.stats.incoming_queued += 1;
+        } else {
+            tracing::warn!(
+                node_id = self.node_id().0,
+                buffer_size = self.incoming.len(),
+                max_buffer = self.config.max_packet_buffer,
+                "Incoming packet buffer full, dropping frame"
+            );
+
+            // Update metrics: increment messages_dropped
+            if let Some(ref metrics) = self.metrics {
+                metrics.messages_dropped.inc();
+            }
         }
     }
 
@@ -387,6 +734,14 @@ impl Node {
     /// Execute one tick of the runtime loop
     /// This is the core 12-stage loop
     pub fn tick(&mut self) {
+        let span = tracing::span!(
+            tracing::Level::INFO,
+            "node_tick",
+            node_id = self.node_id().0,
+            session_id = ?self.session_id
+        );
+        let _enter = span.enter();
+
         let start = Instant::now();
         self.stats.ticks += 1;
 
@@ -400,14 +755,72 @@ impl Node {
         let validated = self.decrypt_and_validate(packets);
 
         // Stage 4: Classify events
+        let classify_start = Instant::now();
         let events = self.classify_events(validated);
+        
+        // Track message processing latency
+        if let Some(ref metrics) = self.metrics {
+            let latency_ms = classify_start.elapsed().as_secs_f64() * 1000.0;
+            if !events.is_empty() {
+                metrics.message_latency_ms.observe(latency_ms);
+            }
+        }
 
         // Stage 5: Update time model
         self.update_time_model(&events);
 
         // Stage 6: Reconcile state
-        let _result = self.state_engine.process_events(events, &self.time_engine);
-        self.state_engine.control_divergence();
+        let reconcile_start = Instant::now();
+        let reconcile_result = {
+            let span = tracing::span!(
+                tracing::Level::DEBUG,
+                "state_reconciliation",
+                node_id = self.node_id().0
+            );
+            let _enter = span.enter();
+            
+            let result = self.state_engine.process_events(events, &self.time_engine);
+            self.state_engine.control_divergence();
+            
+            tracing::debug!(
+                applied = result.applied,
+                rejected = result.rejected,
+                "State reconciliation complete"
+            );
+            result
+        };
+
+        // Track state sync latency
+        if let Some(ref metrics) = self.metrics {
+            let sync_latency_ms = reconcile_start.elapsed().as_secs_f64() * 1000.0;
+            metrics.state_sync_latency_ms.observe(sync_latency_ms);
+        }
+
+        // Update state reconciliation metrics
+        if let Some(ref metrics) = self.metrics {
+            // Track quarantine buffer size
+            let quarantine_size = self.state_engine.field().quarantine_size();
+            metrics.quarantine_buffer_size.set(quarantine_size as i64);
+            
+            // Track rejected events as dropped messages
+            if reconcile_result.rejected > 0 {
+                metrics.messages_dropped.inc_by(reconcile_result.rejected as u64);
+            }
+        }
+
+        // Update time drift metric (track maximum offset across all peers)
+        if let Some(ref metrics) = self.metrics {
+            let max_offset_ms = self.time_engine
+                .network()
+                .peers
+                .values()
+                .map(|peer| peer.offset.abs() * 1000.0) // Convert to milliseconds
+                .fold(0.0f64, f64::max);
+            
+            if max_offset_ms > 0.0 {
+                metrics.time_drift_ms.set(max_offset_ms as i64);
+            }
+        }
 
         // Stage 7: Generate predictions
         self.generate_predictions();
@@ -428,18 +841,42 @@ impl Node {
 
     /// Stage 2: Ingest packets from buffer
     fn ingest_packets(&mut self) -> Vec<Frame> {
+        let span = tracing::span!(
+            tracing::Level::DEBUG,
+            "ingest_packets",
+            node_id = self.node_id().0
+        );
+        let _enter = span.enter();
+
         let packets: Vec<Frame> = self.incoming.drain(..).collect();
         self.stats.packets_in += packets.len() as u64;
+
+        // Update metrics: increment messages_received for each packet
+        if let Some(ref metrics) = self.metrics {
+            metrics.messages_received.inc_by(packets.len() as u64);
+        }
+
+        tracing::debug!(packet_count = packets.len(), "Ingested packets");
         packets
     }
 
     /// Stage 3: Decrypt and validate packets
     fn decrypt_and_validate(&mut self, packets: Vec<Frame>) -> Vec<Frame> {
+        let span = tracing::span!(
+            tracing::Level::DEBUG,
+            "decrypt_and_validate",
+            node_id = self.node_id().0,
+            packet_count = packets.len()
+        );
+        let _enter = span.enter();
+
         let Some(processor) = self.secure_processor.as_mut() else {
+            tracing::debug!("No secure processor, skipping decryption");
             return packets;
         };
 
-        packets
+        let initial_count = packets.len();
+        let validated: Vec<Frame> = packets
             .into_iter()
             .filter_map(|frame| {
                 let data = frame.serialize().ok()?;
@@ -452,23 +889,68 @@ impl Node {
                     auth_tag,
                 })
             })
-            .collect()
+            .collect();
+
+        let failed_count = initial_count - validated.len();
+        if failed_count > 0 {
+            tracing::warn!(
+                node_id = self.node_id().0,
+                failed_count = failed_count,
+                validated_count = validated.len(),
+                "Some frames failed decryption/validation"
+            );
+
+            // Update metrics: track failed connections/decryption attempts
+            if let Some(ref metrics) = self.metrics {
+                metrics.failed_connections.inc_by(failed_count as u64);
+            }
+        }
+
+        tracing::debug!(
+            validated_count = validated.len(),
+            failed_count = failed_count,
+            "Decryption and validation complete"
+        );
+        validated
     }
 
     /// Stage 4: Extract events from validated packets
     fn classify_events(&mut self, packets: Vec<Frame>) -> Vec<Event> {
+        let span = tracing::span!(
+            tracing::Level::DEBUG,
+            "classify_events",
+            node_id = self.node_id().0,
+            packet_count = packets.len()
+        );
+        let _enter = span.enter();
+
         let mut events = Vec::new();
 
         for frame in packets {
             let source = frame.header.node_id;
             let time_hint = frame.header.time_hint;
+            let packet_class = frame.header.class;
+            
+            // Track message size
+            if let Some(ref metrics) = self.metrics {
+                metrics.message_size_bytes.observe(frame.payload.len() as f64);
+            }
+
             let frame_events = self.decode_event_blocks(&frame.payload, source, time_hint);
+            tracing::trace!(
+                source = source.0,
+                event_count = frame_events.len(),
+                packet_class = ?packet_class,
+                "Decoded events from frame"
+            );
+            
             for event in &frame_events {
                 self.handle_event_side_effects(event);
             }
             events.extend(frame_events);
         }
 
+        tracing::debug!(event_count = events.len(), "Event classification complete");
         events
     }
 
@@ -538,6 +1020,14 @@ impl Node {
 
     /// Stage 5: Update time model from events
     fn update_time_model(&mut self, events: &[Event]) {
+        let span = tracing::span!(
+            tracing::Level::DEBUG,
+            "update_time_model",
+            node_id = self.node_id().0,
+            event_count = events.len()
+        );
+        let _enter = span.enter();
+
         let reference = self.time_engine.tau_s();
         for event in events {
             let remote_time = event.time_intent.to_absolute(reference);
@@ -545,6 +1035,8 @@ impl Node {
             self.time_engine
                 .update_from_packet(event.source, remote_time, seq);
         }
+
+        tracing::debug!("Time model updated");
     }
 
     /// Stage 7: Generate predictions for missing state
@@ -579,10 +1071,18 @@ impl Node {
 
     /// Stage 10: Authorize and sign local events
     fn authorize_and_sign(&mut self) -> Vec<Event> {
+        let span = tracing::span!(
+            tracing::Level::DEBUG,
+            "authorize_and_sign",
+            node_id = self.node_id().0,
+            event_count = self.local_events.len()
+        );
+        let _enter = span.enter();
+
         let events: Vec<Event> = self.local_events.drain(..).collect();
         self.stats.events_signed += events.len() as u64;
 
-        events
+        let signed_events = events
             .into_iter()
             .map(|mut event| {
                 // Sign event
@@ -590,18 +1090,35 @@ impl Node {
                 event.authority_proof.signature = signature;
                 event
             })
-            .collect()
+            .collect();
+
+        tracing::debug!("Events authorized and signed");
+        signed_events
     }
 
     /// Stage 11: Build packets from authorized events
     fn build_packets(&mut self, _events: Vec<Event>) {
+        let span = tracing::span!(
+            tracing::Level::DEBUG,
+            "build_packets",
+            node_id = self.node_id().0,
+            event_count = _events.len()
+        );
+        let _enter = span.enter();
+
         let Some(processor) = self.secure_processor.as_mut() else {
             self.build_plain_packets(_events);
             return;
         };
 
+        let mut packets_built = 0;
         for event in _events {
             if self.outgoing.len() >= self.config.max_outgoing_buffer {
+                // Buffer full - drop message
+                if let Some(ref metrics) = self.metrics {
+                    metrics.messages_dropped.inc();
+                }
+                tracing::warn!("Outgoing buffer full, dropping messages");
                 break;
             }
 
@@ -615,14 +1132,37 @@ impl Node {
             {
                 if let Ok(frame) = Frame::parse(&bytes) {
                     self.outgoing.push_back(frame);
+                    packets_built += 1;
+                    
+                    // Update metrics: increment messages_sent
+                    if let Some(ref metrics) = self.metrics {
+                        metrics.messages_sent.inc();
+                        metrics.message_size_bytes.observe(bytes.len() as f64);
+                    }
                 }
             }
         }
+
+        tracing::debug!(packets_built = packets_built, "Packets built");
     }
 
     fn build_plain_packets(&mut self, events: Vec<Event>) {
+        let span = tracing::span!(
+            tracing::Level::DEBUG,
+            "build_plain_packets",
+            node_id = self.node_id().0,
+            event_count = events.len()
+        );
+        let _enter = span.enter();
+
+        let mut packets_built = 0;
         for event in events {
             if self.outgoing.len() >= self.config.max_outgoing_buffer {
+                // Buffer full - drop message
+                if let Some(ref metrics) = self.metrics {
+                    metrics.messages_dropped.inc();
+                }
+                tracing::warn!("Outgoing buffer full, dropping messages");
                 break;
             }
 
@@ -637,9 +1177,18 @@ impl Node {
             header.profile = profile;
             header.time_hint = time_hint;
 
-            let frame = FrameBuilder::new(header).payload(payload).build();
+            let frame = FrameBuilder::new(header).payload(payload.clone()).build();
             self.outgoing.push_back(frame);
+            packets_built += 1;
+
+            // Update metrics: increment messages_sent
+            if let Some(ref metrics) = self.metrics {
+                metrics.messages_sent.inc();
+                metrics.message_size_bytes.observe(payload.len() as f64);
+            }
         }
+
+        tracing::debug!(packets_built = packets_built, "Plain packets built");
     }
 
     fn decode_event_blocks(&self, payload: &[u8], source: NodeId, time_hint: i32) -> Vec<Event> {

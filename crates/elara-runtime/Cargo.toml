@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors = ["ELARA Protocol Contributors"]
-repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+repository.workspace = true
 homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-runtime"
 readme = "README.md"
@@ -14,19 +14,34 @@ categories = ["network-programming", "asynchronous"]
 rust-version = "1.75"
 
 [dependencies]
-elara-core = "0.1.0"
-elara-wire = "0.1.0"
-elara-crypto = "0.1.0"
-elara-time = "0.1.0"
-elara-state = "0.1.0"
-elara-transport = "0.1.0"
-elara-visual = "0.1.0"
-elara-voice = "0.1.0"
+elara-core = { version = "0.2.0", path = "../elara-core" }
+elara-wire = { version = "0.2.0", path = "../elara-wire" }
+elara-crypto = { version = "0.2.0", path = "../elara-crypto" }
+elara-time = { version = "0.2.0", path = "../elara-time" }
+elara-state = { version = "0.2.0", path = "../elara-state" }
+elara-transport = { version = "0.2.0", path = "../elara-transport" }
+elara-visual = { version = "0.2.0", path = "../elara-visual" }
+elara-voice = { version = "0.2.0", path = "../elara-voice" }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+tracing-opentelemetry = "0.22"
+opentelemetry = { version = "0.21", features = ["trace"] }
+opentelemetry_sdk = { version = "0.21", features = ["trace", "rt-tokio"] }
+opentelemetry-jaeger = { version = "0.20", features = ["rt-tokio"] }
+opentelemetry-zipkin = "0.19"
+opentelemetry-otlp = { version = "0.14", features = ["trace", "grpc-tonic"] }
 parking_lot = { workspace = true }
+axum = "0.7"
+sysinfo = "0.30"
+humantime = "2.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
-elara-msp = { path = "../elara-msp" }
+elara-msp = { version = "0.2.0", path = "../elara-msp" }
 proptest = { workspace = true }
+reqwest = { version = "0.11", features = ["json"] }
+serde_json = "1.0"
+serial_test = "3.0"

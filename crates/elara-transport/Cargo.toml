@@ -12,8 +12,8 @@ keywords = ["udp", "transport", "stun", "nat", "elara"]
 categories = ["network-programming"]
 
 [dependencies]
-elara-core = { path = "../elara-core", version = "0.1.0" }
-elara-wire = { path = "../elara-wire", version = "0.1.0" }
+elara-core = { version = "0.2.0", path = "../elara-core" }
+elara-wire = { version = "0.2.0", path = "../elara-wire" }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

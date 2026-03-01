@@ -36,3 +36,34 @@ coverage/
 # Environment
 .env
 .env.local
+
+# Generated SBOM files
+sbom.json
+sbom-*.json
+
+# API Tokens and Secrets - CRITICAL
+API TOKEN CRATES.IO.txt
+**/token*.txt
+**/*secret*.txt
+**/*password*.txt
+**/*key*.txt
+
+# Kiro IDE Internal
+.kiro/
+
+# Temporary Reports and Internal Documentation
+*_REPORT.md
+PHASE*.md
+ANNOUNCEMENT_*.md
+EXECUTIVE_SUMMARY.md
+OPERATOR_NOTES_*.md
+NOBAR/
+
+# Temporary Scripts
+scripts/verify_functional.ps1
+
+# Android build artifacts
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/*/build/

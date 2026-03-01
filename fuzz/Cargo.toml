@@ -1,0 +1,41 @@
+[package]
+name = "elara-fuzz-targets"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1.3", features = ["derive"] }
+
+# ELARA crates to fuzz
+elara-fuzz = { path = "../crates/elara-fuzz" }
+elara-core = { path = "../crates/elara-core" }
+elara-wire = { path = "../crates/elara-wire" }
+elara-crypto = { path = "../crates/elara-crypto" }
+elara-state = { path = "../crates/elara-state" }
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "wire_protocol"
+path = "fuzz_targets/wire_protocol.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "crypto_operations"
+path = "fuzz_targets/crypto_operations.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "state_reconciliation"
+path = "fuzz_targets/state_reconciliation.rs"
+test = false
+doc = false

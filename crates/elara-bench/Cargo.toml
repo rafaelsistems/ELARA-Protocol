@@ -1,0 +1,43 @@
+[package]
+name = "elara-bench"
+description = "ELARA Protocol - Production-grade benchmark suite with criterion for statistical analysis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors = ["ELARA Protocol Contributors"]
+repository.workspace = true
+homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
+documentation = "https://docs.rs/elara-bench"
+readme = "README.md"
+keywords = ["elara", "benchmark", "performance", "criterion"]
+categories = ["development-tools::profiling"]
+rust-version = "1.75"
+
+[dependencies]
+elara-core = { version = "0.2.0", path = "../elara-core" }
+elara-wire = { version = "0.2.0", path = "../elara-wire" }
+elara-crypto = { version = "0.2.0", path = "../elara-crypto" }
+elara-time = { version = "0.2.0", path = "../elara-time" }
+elara-state = { version = "0.2.0", path = "../elara-state" }
+criterion = { version = "0.5", features = ["html_reports"] }
+rand = { workspace = true }
+
+[lib]
+name = "elara_bench"
+path = "src/lib.rs"
+
+[[bench]]
+name = "wire_protocol"
+harness = false
+
+[[bench]]
+name = "crypto_operations"
+harness = false
+
+[[bench]]
+name = "state_reconciliation"
+harness = false
+
+[[bench]]
+name = "time_engine"
+harness = false

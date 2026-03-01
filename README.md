@@ -51,12 +51,13 @@ See [HARD_INVARIANTS.md](docs/HARD_INVARIANTS.md) for the complete specification
 | Component | Status | Description |
 |-----------|--------|-------------|
 | Architecture | ✅ Complete | Full specification |
-| Core Implementation | ✅ Complete | 9 crates, 86 tests |
-| Documentation | ✅ Complete | 12 comprehensive docs |
+| Core Implementation | ✅ Complete | 16 crates, comprehensive tests |
+| Documentation | ✅ Complete | Comprehensive docs |
 | MSP v0 Spec | ✅ Complete | Text + Voice minimal |
-| Production Ready | ✅ Yes | Internal audit completed |
+| Production Features | ✅ Complete | Observability, security, performance |
+| Production Ready | ✅ Yes | v0.2.0 |
 
-**Current Version: v1.0 (Production)**
+**Current Version: v0.2.0 (Production)**
 
 ## Quick Start
 
@@ -130,9 +131,16 @@ crates/
 ├── elara-time      # Time engine
 ├── elara-state     # State reconciliation
 ├── elara-transport # Network transport
-├── elara-runtime   # Node runtime
+├── elara-runtime   # Node runtime with observability
 ├── elara-msp       # MSP profiles
-└── elara-test      # Testing harness
+├── elara-test      # Testing harness and security tests
+├── elara-ffi       # Foreign function interface
+├── elara-visual    # Visual state encoding
+├── elara-diffusion # Swarm diffusion
+├── elara-voice     # Voice encoding
+├── elara-fuzz      # Fuzzing infrastructure
+├── elara-bench     # Performance benchmarks
+└── elara-loadtest  # Load testing framework
 ```
 
 ## Documentation
@@ -191,20 +199,28 @@ cargo test -p elara-crypto
 ## Roadmap
 
 ```
-v1.0 (Completed) - Production
-    ✅ Security audit (internal)
-    ✅ Performance optimization
-    ✅ Formal stability guarantees
-
-v0.2 (Completed) - Beta
-    ✅ Voice codec integration
-    ✅ Mobile SDK
+v0.2 (Current) - Production Readiness
+    ✅ Standardized version management
+    ✅ Observability infrastructure
+    ✅ Security hardening
+    ✅ Performance validation
+    ✅ Operational tooling
 
 v0.1 (Completed) - Alpha
     ✅ End-to-end integration tests
     ✅ Real network testing
     ✅ Basic NAT traversal (STUN + hole punching)
     ✅ Basic performance benchmarks
+
+v0.3 (Planned) - Enhanced Features
+    ⏳ Advanced NAT traversal (TURN)
+    ⏳ Enhanced mobile SDK
+    ⏳ Additional MSP profiles
+
+v1.0 (Future) - Production
+    ⏳ External security audit
+    ⏳ Performance optimization
+    ⏳ Formal stability guarantees
 
 v0.0 (Completed) - Research Prototype
     ✅ Core implementation

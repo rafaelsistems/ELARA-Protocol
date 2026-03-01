@@ -14,11 +14,15 @@ members = [
     "crates/elara-visual",
     "crates/elara-diffusion",
     "crates/elara-voice",
+    "crates/elara-fuzz",
+    "crates/elara-bench",
+    "crates/elara-loadtest",
     "examples/msp-demo",
+    "NOBAR",
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rafaelsistems/ELARA-Protocol"

@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors = ["ELARA Protocol Contributors"]
-repository = "https://github.com/rafaelsistems/ELARA-Protocol"
+repository.workspace = true
 homepage = "https://github.com/rafaelsistems/ELARA-Protocol"
 documentation = "https://docs.rs/elara-msp"
 readme = "README.md"
@@ -14,11 +14,11 @@ categories = ["network-programming", "multimedia"]
 rust-version = "1.75"
 
 [dependencies]
-elara-core = "0.1.0"
-elara-wire = "0.1.0"
-elara-crypto = "0.1.0"
-elara-time = "0.1.0"
-elara-state = "0.1.0"
+elara-core = { version = "0.2.0", path = "../elara-core" }
+elara-wire = { version = "0.2.0", path = "../elara-wire" }
+elara-crypto = { version = "0.2.0", path = "../elara-crypto" }
+elara-time = { version = "0.2.0", path = "../elara-time" }
+elara-state = { version = "0.2.0", path = "../elara-state" }
 thiserror = { workspace = true }
 
 [dev-dependencies]

@@ -21,6 +21,11 @@ impl Identity {
         let verifying_key = signing_key.verifying_key();
         let node_id = Self::derive_node_id(&verifying_key);
 
+        tracing::info!(
+            node_id = node_id.0,
+            "Generated new identity"
+        );
+
         Identity {
             signing_key,
             verifying_key,
@@ -58,6 +63,11 @@ impl Identity {
 
     /// Sign a message
     pub fn sign(&self, message: &[u8]) -> [u8; 64] {
+        tracing::debug!(
+            node_id = self.node_id.0,
+            message_size = message.len(),
+            "Signing message"
+        );
         let signature = self.signing_key.sign(message);
         signature.to_bytes()
     }
@@ -65,7 +75,17 @@ impl Identity {
     /// Verify a signature
     pub fn verify(&self, message: &[u8], signature: &[u8; 64]) -> bool {
         let sig = Signature::from_bytes(signature);
-        self.verifying_key.verify(message, &sig).is_ok()
+        let result = self.verifying_key.verify(message, &sig).is_ok();
+        
+        if !result {
+            tracing::warn!(
+                node_id = self.node_id.0,
+                message_size = message.len(),
+                "Signature verification failed"
+            );
+        }
+        
+        result
     }
 
     /// Derive NodeId from public key (first 8 bytes of SHA-256)
